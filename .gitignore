@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Firebase admin secrets
+edusphere-ai-2e805-firebase-adminsdk-fbsvc-1240f5aab8.json
