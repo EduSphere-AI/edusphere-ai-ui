@@ -14,7 +14,7 @@ const Footer = () => {
                     {/* Branding */}
                     <div className="sm:col-span-2 lg:col-span-1">
                         <div className="flex items-center gap-2 mb-4">
-                            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                                 <Sparkles className="w-5 h-5 text-white" />
                             </div>
                             <h3 className="text-xl font-bold gradient-text">
@@ -106,7 +106,7 @@ const Footer = () => {
                             </li>
                             <li>
                                 <Link href="/register" className="block">
-                                    <Button className="w-full justify-center text-sm sm:text-base bg-linear-to-r from-primary to-accent hover:shadow-lg transition-all">
+                                    <Button className="w-full justify-center text-sm sm:text-base px-3 sm:px-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:shadow-lg transition-all font-bold text-white">
                                         Get Started
                                         <ArrowRight
                                             className="ml-2"
