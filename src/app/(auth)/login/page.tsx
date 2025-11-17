@@ -12,12 +12,16 @@ import {
     ArrowRight,
     AlertCircle,
 } from 'lucide-react';
+import { useAuthStore } from '@/store/auth.store';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const { login } = useAuthStore();
+
     const router = useRouter();
 
     const handleEmailLogin = async (e: React.FormEvent) => {
@@ -32,6 +36,11 @@ export default function LoginPage() {
                 password,
             );
             console.log('User logged in:', userCredential.user);
+            login({
+                id: userCredential.user.uid,
+                name: userCredential.user.displayName || '',
+                email: userCredential.user.email || '',
+            });
             router.push('/dashboard');
         } catch (err: any) {
             console.error('Login error:', err);
@@ -64,6 +73,11 @@ export default function LoginPage() {
         try {
             const result = await signInWithPopup(auth, googleProvider);
             console.log('Google user logged in:', result.user);
+            login({
+                id: result.user.uid,
+                name: result.user.displayName || '',
+                email: result.user.email || '',
+            });
             router.push('/dashboard');
         } catch (err: any) {
             console.error('Google login error:', err);

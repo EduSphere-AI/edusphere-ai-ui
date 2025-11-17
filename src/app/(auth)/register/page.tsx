@@ -19,6 +19,7 @@ import {
     CheckCircle2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuthStore } from '@/store/auth.store';
 
 export default function RegisterPage() {
     const [name, setName] = useState('');
@@ -26,6 +27,9 @@ export default function RegisterPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const { login } = useAuthStore();
+
     const router = useRouter();
 
     const passwordRequirements = [
@@ -54,6 +58,12 @@ export default function RegisterPage() {
 
             await updateProfile(userCredential.user, {
                 displayName: name,
+            });
+
+            login({
+                id: userCredential.user.uid,
+                name: name,
+                email: userCredential.user.email || '',
             });
 
             console.log('User registered:', userCredential.user);
@@ -86,6 +96,11 @@ export default function RegisterPage() {
         try {
             const result = await signInWithPopup(auth, googleProvider);
             console.log('Google user registered:', result.user);
+            login({
+                id: result.user.uid,
+                name: result.user.displayName || '',
+                email: result.user.email || '',
+            });
             router.push('/dashboard');
         } catch (err: any) {
             console.error('Google registration error:', err);

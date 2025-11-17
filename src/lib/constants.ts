@@ -1,1 +1,1 @@
-export const APP_NAME = "edusphere-ai";
+export const APP_NAME = 'edusphere-ai';
