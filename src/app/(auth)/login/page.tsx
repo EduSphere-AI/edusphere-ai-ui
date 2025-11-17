@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
+import { auth, googleProvider, getUserProfile } from '@/lib/firebase';
+
 import {
     Mail,
     Lock,
@@ -35,12 +36,25 @@ export default function LoginPage() {
                 email,
                 password,
             );
-            console.log('User logged in:', userCredential.user);
+
+            // Wait for auth state to settle
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            // Fetch user profile from Firestore (optional)
+            const userProfile = await getUserProfile(userCredential.user.uid);
+
+            // Update local auth state
             login({
                 id: userCredential.user.uid,
-                name: userCredential.user.displayName || '',
+                name:
+                    userProfile?.name || userCredential.user.displayName || '',
                 email: userCredential.user.email || '',
             });
+
+            console.log(
+                '✅ User logged in successfully:',
+                userCredential.user.uid,
+            );
             router.push('/dashboard');
         } catch (err: any) {
             console.error('Login error:', err);
@@ -50,10 +64,12 @@ export default function LoginPage() {
                     setError('Invalid email address');
                     break;
                 case 'auth/user-not-found':
-                    setError('No account found with this email');
-                    break;
                 case 'auth/wrong-password':
-                    setError('Incorrect password');
+                    // Combine these for security (don't reveal which is wrong)
+                    setError('Invalid email or password');
+                    break;
+                case 'auth/invalid-credential':
+                    setError('Invalid email or password');
                     break;
                 case 'auth/too-many-requests':
                     setError('Too many failed attempts. Try again later');
@@ -72,16 +88,39 @@ export default function LoginPage() {
 
         try {
             const result = await signInWithPopup(auth, googleProvider);
-            console.log('Google user logged in:', result.user);
+
+            // Wait for auth state to settle
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            // Fetch user profile from Firestore (optional)
+            const userProfile = await getUserProfile(result.user.uid);
+
+            // Update local auth state
             login({
                 id: result.user.uid,
-                name: result.user.displayName || '',
+                name: userProfile?.name || result.user.displayName || '',
                 email: result.user.email || '',
             });
+
+            console.log(
+                '✅ Google user logged in successfully:',
+                result.user.uid,
+            );
             router.push('/dashboard');
         } catch (err: any) {
             console.error('Google login error:', err);
-            setError('Google login failed. Please try again');
+
+            if (err.code === 'auth/popup-closed-by-user') {
+                setError('Google sign-in was cancelled');
+            } else if (
+                err.code === 'auth/account-exists-with-different-credential'
+            ) {
+                setError(
+                    'An account already exists with this email using a different sign-in method',
+                );
+            } else {
+                setError('Google login failed. Please try again');
+            }
         } finally {
             setLoading(false);
         }
