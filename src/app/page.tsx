@@ -150,28 +150,25 @@ export default function Home() {
                                             icon: FileTextIcon,
                                             text: 'Extracting text...',
                                             value: 100,
-                                            color: 'blue',
                                         },
                                         {
                                             icon: ChartNoAxesCombinedIcon,
                                             text: 'Processing content...',
                                             value: 65,
-                                            color: 'cyan',
                                         },
                                         {
                                             icon: TableIcon,
                                             text: 'Analyzing tables...',
                                             value: 40,
-                                            color: 'blue',
                                         },
                                     ].map((stage, i) => (
                                         <div
                                             key={i}
-                                            className={`flex items-center gap-3 p-3 bg-${stage.color}-100 dark:bg-${stage.color}-900/20 rounded-lg border-2 border-${stage.color}-200 dark:border-${stage.color}-800`}
+                                            className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border-2 border-blue-200 dark:border-blue-800"
                                         >
                                             <stage.icon
                                                 size={20}
-                                                className={`text-${stage.color}-600 dark:text-${stage.color}-400 flex-shrink-0`}
+                                                className="text-blue-600 dark:text-blue-400 flex-shrink-0"
                                             />
                                             <div className="flex-1">
                                                 <p className="text-sm font-bold mb-1 text-gray-900 dark:text-gray-100">
@@ -179,7 +176,7 @@ export default function Home() {
                                                 </p>
                                                 <Progress
                                                     value={stage.value}
-                                                    className="h-2"
+                                                    className="h-2 bg-gray-200 dark:bg-gray-700 [&>div]:bg-gradient-to-r [&>div]:from-blue-600 [&>div]:to-cyan-600"
                                                 />
                                             </div>
                                         </div>
