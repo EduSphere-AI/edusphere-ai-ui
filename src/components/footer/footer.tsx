@@ -106,7 +106,7 @@ const Footer = () => {
                             </li>
                             <li>
                                 <Link href="/register" className="block">
-                                    <Button className="w-full justify-center text-sm sm:text-base bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all">
+                                    <Button className="w-full justify-center text-sm sm:text-base px-3 sm:px-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:shadow-lg transition-all font-bold text-white">
                                         Get Started
                                         <ArrowRight
                                             className="ml-2"
