@@ -64,13 +64,13 @@ export default function PrivacyPolicy() {
 
                 <div className="relative bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl p-10 space-y-8 overflow-hidden">
                     {/* Gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-blue-500/5 pointer-events-none"></div>
+                    <div className="absolute inset-0 bg-linear-to-br from-cyan-500/5 via-transparent to-blue-500/5 pointer-events-none"></div>
 
                     {/* Content */}
                     <div className="relative z-10">
                         {/* Header */}
                         <div className="text-center mb-10">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-600 mb-4 shadow-lg">
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-linear-to-br from-cyan-600 to-blue-600 mb-4 shadow-lg">
                                 <ShieldCheck className="w-8 h-8 text-white" />
                             </div>
                             <h1 className="text-5xl font-bold gradient-text mb-4">
@@ -92,7 +92,7 @@ export default function PrivacyPolicy() {
                                         className="group p-6 rounded-xl bg-gray-50 dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 border-2 border-gray-200 dark:border-gray-700 hover:border-cyan-400 dark:hover:border-cyan-600 transition-all duration-300 hover:shadow-lg"
                                     >
                                         <div className="flex items-start gap-4">
-                                            <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
+                                            <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-linear-to-br from-cyan-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
                                                 <Icon className="w-6 h-6 text-white" />
                                             </div>
                                             <div className="flex-1">
@@ -110,7 +110,7 @@ export default function PrivacyPolicy() {
                         </div>
 
                         {/* Highlight Box */}
-                        <div className="mt-8 p-6 rounded-xl bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-800">
+                        <div className="mt-8 p-6 rounded-xl bg-linear-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-800">
                             <div className="flex items-start gap-3">
                                 <ShieldCheck className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" />
                                 <div>

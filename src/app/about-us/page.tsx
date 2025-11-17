@@ -41,7 +41,7 @@ export default function AboutUsPage() {
                     {/* Mission */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg">
+                            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg">
                                 <Target className="w-6 h-6 text-white" />
                             </div>
                             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold gradient-text">
@@ -63,7 +63,7 @@ export default function AboutUsPage() {
                     {/* Team */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg">
+                            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg">
                                 <Users className="w-6 h-6 text-white" />
                             </div>
                             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold gradient-text">
@@ -80,7 +80,7 @@ export default function AboutUsPage() {
                                     key={member.name}
                                     className="group p-6 bg-gray-50 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 text-center"
                                 >
-                                    <div className="h-20 w-20 mx-auto mb-4 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-lg group-hover:scale-110 transition-transform">
+                                    <div className="h-20 w-20 mx-auto mb-4 bg-linear-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-lg group-hover:scale-110 transition-transform">
                                         {member.name[0]}
                                     </div>
                                     <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">
@@ -97,7 +97,7 @@ export default function AboutUsPage() {
                     {/* Project Challenges */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg">
+                            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg">
                                 <Lightbulb className="w-6 h-6 text-white" />
                             </div>
                             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold gradient-text">
@@ -143,7 +143,7 @@ export default function AboutUsPage() {
                     {/* Project Overview */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg">
+                            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg">
                                 <Workflow className="w-6 h-6 text-white" />
                             </div>
                             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold gradient-text">
@@ -172,7 +172,7 @@ export default function AboutUsPage() {
                     {/* Main Objectives */}
                     <section>
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg">
+                            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg">
                                 <TrendingUp className="w-6 h-6 text-white" />
                             </div>
                             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold gradient-text">
@@ -188,7 +188,7 @@ export default function AboutUsPage() {
                                 'Display structured content on a user-friendly interface for educators and students.',
                             ].map((obj, i) => (
                                 <li key={i} className="flex items-start gap-3">
-                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md">
+                                    <div className="w-6 h-6 rounded-full bg-linear-to-br from-blue-600 to-cyan-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md">
                                         <span className="text-white font-bold text-sm">
                                             {i + 1}
                                         </span>
@@ -202,7 +202,7 @@ export default function AboutUsPage() {
                     {/* Contact */}
                     <section className="pt-8 border-t-2 border-gray-200 dark:border-gray-700">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg">
+                            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg">
                                 <Mail className="w-6 h-6 text-white" />
                             </div>
                             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold gradient-text">

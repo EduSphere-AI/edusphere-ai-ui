@@ -11,11 +11,11 @@ export default function NotFound() {
             {/* Main card */}
             <div className="relative max-w-md w-full bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl p-6 sm:p-8 lg:p-10 text-center overflow-hidden">
                 {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none"></div>
+                <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none"></div>
 
                 <div className="relative z-10 flex flex-col items-center">
                     {/* Header Icon */}
-                    <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 mb-6 shadow-lg animate-pulse">
+                    <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-linear-to-br from-blue-600 to-cyan-600 mb-6 shadow-lg animate-pulse">
                         <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                     </div>
 
@@ -34,7 +34,7 @@ export default function NotFound() {
                     {/* Back to Home Button */}
                     <Link
                         href="/"
-                        className="group inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 w-full sm:w-auto"
+                        className="group inline-flex items-center justify-center gap-2 bg-linear-to-r from-blue-600 to-cyan-600 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 w-full sm:w-auto"
                     >
                         <Home size={20} />
                         <span>Back to Home</span>

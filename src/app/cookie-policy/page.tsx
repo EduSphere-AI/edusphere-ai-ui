@@ -23,12 +23,12 @@ export default function CookiePolicyPage() {
 
                 <div className="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl p-6 sm:p-8 lg:p-10 space-y-8 overflow-hidden">
                     {/* Gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none"></div>
+                    <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none"></div>
 
                     <div className="relative z-10">
                         {/* Header */}
                         <div className="text-center mb-10">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 mb-4 shadow-lg">
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-linear-to-br from-blue-600 to-cyan-600 mb-4 shadow-lg">
                                 <Cookie className="w-8 h-8 text-white" />
                             </div>
                             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold gradient-text mb-4">
@@ -46,7 +46,7 @@ export default function CookiePolicyPage() {
                             {/* What are Cookies */}
                             <div className="p-6 rounded-xl bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 transition-all">
                                 <div className="flex items-start gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                                    <div className="w-10 h-10 rounded-lg bg-linear-to-br from-blue-600 to-cyan-600 flex items-center justify-center flex-shrink-0 shadow-md">
                                         <Cookie className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex-1">
@@ -66,7 +66,7 @@ export default function CookiePolicyPage() {
                             {/* How We Use Cookies */}
                             <div className="p-6 rounded-xl bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-cyan-400 dark:hover:border-cyan-600 transition-all">
                                 <div className="flex items-start gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                                    <div className="w-10 h-10 rounded-lg bg-linear-to-br from-cyan-600 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-md">
                                         <Database className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex-1">
@@ -112,7 +112,7 @@ export default function CookiePolicyPage() {
                             {/* Managing Cookies */}
                             <div className="p-6 rounded-xl bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 transition-all">
                                 <div className="flex items-start gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                                    <div className="w-10 h-10 rounded-lg bg-linear-to-br from-blue-600 to-cyan-600 flex items-center justify-center flex-shrink-0 shadow-md">
                                         <Settings className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex-1">
@@ -133,7 +133,7 @@ export default function CookiePolicyPage() {
                             {/* Contact */}
                             <div className="p-6 rounded-xl bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-cyan-400 dark:hover:border-cyan-600 transition-all">
                                 <div className="flex items-start gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                                    <div className="w-10 h-10 rounded-lg bg-linear-to-br from-cyan-600 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-md">
                                         <Shield className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex-1">

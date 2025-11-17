@@ -2,6 +2,7 @@ import './globals.css';
 import Navbar from '@/components/navbar/navbar';
 import Footer from '@/components/footer/footer';
 import CookieBanner from '@/components/cookie-banner/cookie-banner';
+import { Toaster } from '@/components/ui/sonner';
 
 export default function RootLayout({
     children,
@@ -17,6 +18,7 @@ export default function RootLayout({
 
                 <Footer />
                 <CookieBanner />
+                <Toaster />
             </body>
         </html>
     );

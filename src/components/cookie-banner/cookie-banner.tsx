@@ -34,7 +34,7 @@ export default function CookieBanner() {
     return (
         <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:max-w-3xl mx-auto bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl p-4 sm:p-6 z-50 animate-in slide-in-from-bottom-5">
             {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5 rounded-2xl pointer-events-none"></div>
+            <div className="absolute inset-0 bg-linear-to-r from-primary/5 to-accent/5 rounded-2xl pointer-events-none"></div>
 
             <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 {/* Icon */}
@@ -64,7 +64,7 @@ export default function CookieBanner() {
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Button
                         onClick={acceptCookies}
-                        className="flex-1 sm:flex-initial bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all text-sm"
+                        className="flex-1 sm:flex-initial bg-linear-to-r from-primary to-accent hover:shadow-lg transition-all text-sm"
                         size="sm"
                     >
                         Accept All
