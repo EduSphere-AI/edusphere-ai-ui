@@ -1,9 +1,7 @@
-// lib/firebase.ts
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
-// 🔍 Environment variable check (optional debug)
 const requiredEnvVars = {
   NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -18,7 +16,7 @@ const missingVars = Object.entries(requiredEnvVars)
   .map(([key]) => key);
 
 if (missingVars.length > 0) {
-  throw new Error(`
+    throw new Error(`
     ❌ Firebase Configuration Error
 
     Missing environment variables in .env.local:
@@ -28,7 +26,6 @@ if (missingVars.length > 0) {
   `);
 }
 
-// Firebase config
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
@@ -45,44 +42,40 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Initialize Firestore
 export const db = getFirestore(app);
 
-// 🔹 Helper: Create user profile in Firestore
 export async function createUserProfile(user: any, extraData: any = {}) {
-  if (!user) return;
+    if (!user) return;
 
-  const userRef = doc(db, 'users', user.uid);
-  const userSnap = await getDoc(userRef);
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
 
-  if (!userSnap.exists()) {
-    try {
-      await setDoc(userRef, {
-        uid: user.uid,
-        email: user.email,
-        name: extraData.username || user.displayName || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        // Do NOT store password - Firebase Auth handles this securely
-      });
-      console.log('✅ User profile created in Firestore:', user.uid);
-    } catch (error) {
-      console.error('❌ Error creating user profile:', error);
-      throw error;
+    if (!userSnap.exists()) {
+        try {
+            await setDoc(userRef, {
+                uid: user.uid,
+                email: user.email,
+                name: extraData.username || user.displayName || '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+            console.log('✅ User profile created in Firestore:', user.uid);
+        } catch (error) {
+            console.error('❌ Error creating user profile:', error);
+            throw error;
+        }
+    } else {
+        console.log('ℹ️ User profile already exists:', user.uid);
     }
-  } else {
-    console.log('ℹ️ User profile already exists:', user.uid);
-  }
 }
 
-// 🔹 Helper: Fetch user profile
 export async function getUserProfile(uid: string) {
-  const userRef = doc(db, 'users', uid);
-  const userSnap = await getDoc(userRef);
-  if (userSnap.exists()) {
-    return userSnap.data();
-  }
-  return null;
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+        return userSnap.data();
+    }
+    return null;
 }
 
 console.log('✅ Firebase + Firestore initialized successfully');

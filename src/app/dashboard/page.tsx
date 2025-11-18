@@ -32,10 +32,11 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { uploadFile, listUserFiles } from '@/lib/supabase';
+import { listUserFiles } from '@/lib/supabase';
+import { uploadFileWithMetadata } from '@/lib/upload-utils';
+import { saveFileMetadata } from '@/lib/firestore-client';
 import { toast } from 'sonner';
 
-// Types
 interface Document {
     id: string;
     title: string;
@@ -47,17 +48,14 @@ interface Document {
 
 type DocumentStatus = Document['status'];
 
-// Constants
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
 const ACCEPTED_FILE_TYPES = '.pdf';
 
-// Helper function to extract original filename from timestamp prefixed name
 const extractOriginalFilename = (fileName: string): string => {
     const match = fileName.match(/^\d+-(.+)$/);
     return match ? match[1] : fileName;
 };
 
-// Helper function to format file size
 const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -66,7 +64,6 @@ const formatFileSize = (bytes: number): string => {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 };
 
-// Component: Status Badge
 const StatusBadge = ({ status }: { status: DocumentStatus }) => {
     const statusConfig = useMemo(
         () => ({
@@ -103,7 +100,6 @@ const StatusBadge = ({ status }: { status: DocumentStatus }) => {
     );
 };
 
-// Component: Document Action Button
 const DocumentActionButton = ({
     status,
     docId,
@@ -156,7 +152,6 @@ const DocumentActionButton = ({
     );
 };
 
-// Component: File Upload Zone
 const FileUploadZone = ({
     onFileSelect,
     isUploading,
@@ -280,10 +275,8 @@ export default function Dashboard() {
     const [isUploading, setIsUploading] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Memoized document count
     const documentCount = useMemo(() => documents.length, [documents.length]);
 
-    // Fetch user's uploaded files on mount
     useEffect(() => {
         const fetchUserFiles = async () => {
             if (!user) {
@@ -292,7 +285,6 @@ export default function Dashboard() {
             }
 
             try {
-                console.log('Fetching files for user:', user.id);
                 const result = await listUserFiles(user.id);
 
                 if (result.success && result.files) {
@@ -310,11 +302,6 @@ export default function Dashboard() {
                     );
 
                     setDocuments(formattedDocs);
-                    console.log(
-                        `Loaded ${formattedDocs.length} files from storage`,
-                    );
-                } else {
-                    console.warn('No files found or error:', result.error);
                 }
             } catch (error) {
                 console.error('Error fetching user files:', error);
@@ -327,22 +314,18 @@ export default function Dashboard() {
         fetchUserFiles();
     }, [user]);
 
-    // Handle file validation and upload
     const handleFileSelect = useCallback(
         async (file: File) => {
-            // Check if user is logged in
             if (!user) {
                 toast.error('Please log in to upload files');
                 return;
             }
 
-            // Validate file type
             if (!file.name.endsWith('.pdf')) {
                 toast.warning('Please upload a PDF file');
                 return;
             }
 
-            // Validate file size (5MB limit)
             if (file.size > MAX_FILE_SIZE) {
                 toast.warning(
                     `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB`,
@@ -353,30 +336,59 @@ export default function Dashboard() {
             setIsUploading(true);
 
             try {
-                // Upload file to Supabase
                 console.log('Uploading file to Supabase...', {
                     fileName: file.name,
                     fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
                     userId: user.id,
                 });
 
-                const uploadResult = await uploadFile(file, user.id);
+                const uploadResult = await uploadFileWithMetadata(
+                    file,
+                    user.id,
+                );
 
                 if (!uploadResult.success) {
                     throw new Error(uploadResult.error || 'Upload failed');
                 }
 
+                toast.success('File uploaded successfully!');
+
                 console.log('File uploaded successfully!', {
                     path: uploadResult.path,
                     publicUrl: uploadResult.publicUrl,
+                    fileId: uploadResult.fileId,
+                    metadata: uploadResult.metadata,
                 });
 
-                // Print download URL to console
                 console.log('📥 File Download URL:', uploadResult.publicUrl);
+                console.log('🔥 File ID:', uploadResult.fileId);
 
-                // Create new document entry with file URL
+                // Save file metadata to Firestore
+                const firestoreSave = await saveFileMetadata({
+                    userId: user.id,
+                    fileName: uploadResult.fileName || file.name,
+                    originalFileName: file.name,
+                    fileSize: file.size,
+                    mimeType: file.type,
+                    supabasePath: uploadResult.path || '',
+                    supabasePublicUrl: uploadResult.publicUrl || '',
+                    supabaseBucket: 'documents',
+                    status: 'uploaded',
+                });
+
+                if (!firestoreSave.success) {
+                    console.error(
+                        'Failed to save to Firestore:',
+                        firestoreSave.error,
+                    );
+                    toast.error('File uploaded but failed to save metadata');
+                }
+
                 const newDoc: Document = {
-                    id: String(Date.now()),
+                    id:
+                        firestoreSave.fileId ||
+                        uploadResult.fileId ||
+                        String(Date.now()),
                     title: file.name,
                     uploadDate: new Date().toISOString().split('T')[0],
                     status: 'Processing',
@@ -386,15 +398,13 @@ export default function Dashboard() {
 
                 setDocuments((prev) => [newDoc, ...prev]);
 
-                // Show success message
                 toast.success(
-                    `File uploaded successfully!\n\nDownload URL:\n${uploadResult.publicUrl}\n\n(Check console for details)`,
+                    `File uploaded successfully!\n\nFirestore ID: ${firestoreSave.fileId}`,
                 );
 
-                // Navigate to processing page
-                setTimeout(() => {
-                    router.push(`/processing/${newDoc.id}`);
-                }, 1000);
+                // setTimeout(() => {
+                //     router.push(`/processing/${newDoc.id}`);
+                // }, 1000);
             } catch (error) {
                 console.error('Upload error:', error);
                 toast.error(
@@ -407,7 +417,6 @@ export default function Dashboard() {
         [router, user],
     );
 
-    // Handle navigation
     const handleNavigate = useCallback(
         (path: string) => {
             if (path !== '#') {
@@ -419,12 +428,10 @@ export default function Dashboard() {
 
     return (
         <div className="min-h-screen bg-gradient-offwhite-pink-blue relative overflow-hidden">
-            {/* Floating Decorative Elements */}
             <div className="absolute top-10 left-5 w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
             <div className="absolute bottom-10 right-5 w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-700" />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16 relative z-10">
-                {/* Welcome Section */}
                 <div className="mb-8 sm:mb-12 space-y-2">
                     <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold gradient-text">
                         Dashboard
@@ -435,13 +442,11 @@ export default function Dashboard() {
                     </p>
                 </div>
 
-                {/* Upload Area */}
                 <FileUploadZone
                     onFileSelect={handleFileSelect}
                     isUploading={isUploading}
                 />
 
-                {/* Documents List */}
                 <Card className="border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl relative overflow-hidden">
                     <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none" />
                     <CardHeader className="relative">
@@ -565,7 +570,6 @@ export default function Dashboard() {
                 </Card>
             </main>
 
-            {/* Floating Action Button */}
             <div className="fixed bottom-8 right-8 z-50">
                 <label htmlFor="fab-upload" className="cursor-pointer group">
                     <div className="relative">

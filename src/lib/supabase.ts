@@ -11,7 +11,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Storage bucket name
 export const STORAGE_BUCKET = 'uploads';
 
 /**
@@ -22,7 +21,6 @@ export const STORAGE_BUCKET = 'uploads';
  */
 export async function uploadFile(file: File, userId: string) {
     try {
-        // Generate unique filename with timestamp
         const timestamp = Date.now();
         const fileExt = file.name.split('.').pop();
         const fileName = `${userId}/${timestamp}-${file.name}`;
@@ -34,7 +32,6 @@ export async function uploadFile(file: File, userId: string) {
             });
         }
 
-        // Upload file to Supabase storage
         const { data, error } = await supabase.storage
             .from(STORAGE_BUCKET)
             .upload(fileName, file, {
@@ -46,7 +43,6 @@ export async function uploadFile(file: File, userId: string) {
             throw error;
         }
 
-        // Get public URL for the uploaded file
         const {
             data: { publicUrl },
         } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
@@ -148,7 +144,6 @@ export async function listUserFiles(userId: string) {
             throw error;
         }
 
-        // Get public URLs for all files
         const filesWithUrls = data.map((file) => {
             const filePath = `${userId}/${file.name}`;
             const {

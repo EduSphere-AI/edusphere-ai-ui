@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { Fragment } from 'react';
 
 const Navbar = () => {
     const { user, logout } = useAuthStore();
@@ -49,9 +50,7 @@ const Navbar = () => {
                     </li>
 
                     {user ? (
-                        // Authenticated User Menu
-                        <>
-                            {/* User Name - Hidden on smallest screens */}
+                        <Fragment>
                             <li className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800">
                                 <User size={16} className="text-blue-600" />
                                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
@@ -59,7 +58,6 @@ const Navbar = () => {
                                 </span>
                             </li>
 
-                            {/* Dashboard */}
                             <li>
                                 <Link href="/dashboard">
                                     <Button
@@ -77,7 +75,6 @@ const Navbar = () => {
                                 </Link>
                             </li>
 
-                            {/* Logout */}
                             <li>
                                 <Button
                                     onClick={handleLogout}
@@ -93,10 +90,9 @@ const Navbar = () => {
                                     </span>
                                 </Button>
                             </li>
-                        </>
+                        </Fragment>
                     ) : (
-                        // Guest User Menu
-                        <>
+                        <Fragment>
                             {/* Sign In */}
                             <li>
                                 <Link href="/login">
@@ -109,7 +105,6 @@ const Navbar = () => {
                                 </Link>
                             </li>
 
-                            {/* Get Started */}
                             <li>
                                 <Link href="/register">
                                     <Button className="text-sm sm:text-base px-3 sm:px-4 bg-linear-to-r from-blue-600 to-cyan-600 hover:shadow-lg transition-all font-bold text-white">
@@ -124,7 +119,7 @@ const Navbar = () => {
                                     </Button>
                                 </Link>
                             </li>
-                        </>
+                        </Fragment>
                     )}
                 </ul>
             </div>
