@@ -7,7 +7,8 @@ import {
     updateProfile,
     signInWithPopup,
 } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
+import { auth, googleProvider, createUserProfile } from '@/lib/firebase';
+
 import {
     User,
     Mail,
@@ -56,17 +57,31 @@ export default function RegisterPage() {
                 password,
             );
 
+            // Update Firebase Auth profile
             await updateProfile(userCredential.user, {
                 displayName: name,
             });
 
+            // Wait for auth state to settle
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            // Create user profile in Firestore (without password)
+            await createUserProfile(userCredential.user, {
+                username: name,
+                email: userCredential.user.email || '',
+            });
+
+            // Update local auth state
             login({
                 id: userCredential.user.uid,
                 name: name,
                 email: userCredential.user.email || '',
             });
 
-            console.log('User registered:', userCredential.user);
+            console.log(
+                '✅ User registered successfully:',
+                userCredential.user.uid,
+            );
             router.push('/dashboard');
         } catch (err: any) {
             console.error('Registration error:', err);
@@ -95,12 +110,20 @@ export default function RegisterPage() {
 
         try {
             const result = await signInWithPopup(auth, googleProvider);
-            console.log('Google user registered:', result.user);
+
+            // Create user profile in Firestore
+            await createUserProfile(result.user, {
+                username: result.user.displayName || '',
+                email: result.user.email || '',
+            });
+
             login({
                 id: result.user.uid,
                 name: result.user.displayName || '',
                 email: result.user.email || '',
             });
+
+            console.log('Google user registered:', result.user);
             router.push('/dashboard');
         } catch (err: any) {
             console.error('Google registration error:', err);

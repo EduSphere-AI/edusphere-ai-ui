@@ -11,10 +11,8 @@ export default function CookieBanner() {
     const [show, setShow] = useState(false);
 
     useEffect(() => {
-        // Only show banner if user is on homepage and hasn't accepted yet
         const accepted = localStorage.getItem('cookiesAccepted');
         if (pathname === '/' && !accepted) {
-            // Add slight delay for polished appearance
             const timer = setTimeout(() => setShow(true), 1000);
             return () => clearTimeout(timer);
         }
