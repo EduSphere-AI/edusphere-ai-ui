@@ -2,6 +2,8 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FileSearch } from 'lucide-react';
+
 import {
     Card,
     CardContent,
@@ -212,7 +214,9 @@ const FileUploadZone = ({
                 <div
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
-                    className={`border-2 border-dashed border-blue-600 rounded-xl p-8 sm:p-12 text-center bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all ${isUploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} group relative overflow-hidden`}
+                    className={`border-2 border-dashed border-blue-600 rounded-xl p-8 sm:p-12 text-center bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all ${
+                        isUploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                    } group relative overflow-hidden`}
                 >
                     <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 to-cyan-500/5 pointer-events-none" />
                     <div className="flex flex-col items-center space-y-4 sm:space-y-6 relative z-10">
@@ -280,10 +284,8 @@ export default function Dashboard() {
     const [isUploading, setIsUploading] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Memoized document count
     const documentCount = useMemo(() => documents.length, [documents.length]);
 
-    // Fetch user's uploaded files on mount
     useEffect(() => {
         const fetchUserFiles = async () => {
             if (!user) {
@@ -292,7 +294,6 @@ export default function Dashboard() {
             }
 
             try {
-                console.log('Fetching files for user:', user.id);
                 const result = await listUserFiles(user.id);
 
                 if (result.success && result.files) {
@@ -310,11 +311,6 @@ export default function Dashboard() {
                     );
 
                     setDocuments(formattedDocs);
-                    console.log(
-                        `Loaded ${formattedDocs.length} files from storage`,
-                    );
-                } else {
-                    console.warn('No files found or error:', result.error);
                 }
             } catch (error) {
                 console.error('Error fetching user files:', error);
@@ -327,25 +323,23 @@ export default function Dashboard() {
         fetchUserFiles();
     }, [user]);
 
-    // Handle file validation and upload
     const handleFileSelect = useCallback(
         async (file: File) => {
-            // Check if user is logged in
             if (!user) {
                 toast.error('Please log in to upload files');
                 return;
             }
 
-            // Validate file type
             if (!file.name.endsWith('.pdf')) {
                 toast.warning('Please upload a PDF file');
                 return;
             }
 
-            // Validate file size (5MB limit)
             if (file.size > MAX_FILE_SIZE) {
                 toast.warning(
-                    `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB`,
+                    `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB. Your file is ${(file.size / 1024 / 1024).toFixed(
+                        2,
+                    )}MB`,
                 );
                 return;
             }
@@ -353,28 +347,12 @@ export default function Dashboard() {
             setIsUploading(true);
 
             try {
-                // Upload file to Supabase
-                console.log('Uploading file to Supabase...', {
-                    fileName: file.name,
-                    fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-                    userId: user.id,
-                });
-
                 const uploadResult = await uploadFile(file, user.id);
 
                 if (!uploadResult.success) {
                     throw new Error(uploadResult.error || 'Upload failed');
                 }
 
-                console.log('File uploaded successfully!', {
-                    path: uploadResult.path,
-                    publicUrl: uploadResult.publicUrl,
-                });
-
-                // Print download URL to console
-                console.log('📥 File Download URL:', uploadResult.publicUrl);
-
-                // Create new document entry with file URL
                 const newDoc: Document = {
                     id: String(Date.now()),
                     title: file.name,
@@ -386,19 +364,19 @@ export default function Dashboard() {
 
                 setDocuments((prev) => [newDoc, ...prev]);
 
-                // Show success message
                 toast.success(
                     `File uploaded successfully!\n\nDownload URL:\n${uploadResult.publicUrl}\n\n(Check console for details)`,
                 );
 
-                // Navigate to processing page
                 setTimeout(() => {
                     router.push(`/processing/${newDoc.id}`);
                 }, 1000);
             } catch (error) {
                 console.error('Upload error:', error);
                 toast.error(
-                    `Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    `Failed to upload file: ${
+                        error instanceof Error ? error.message : 'Unknown error'
+                    }`,
                 );
             } finally {
                 setIsUploading(false);
@@ -407,7 +385,6 @@ export default function Dashboard() {
         [router, user],
     );
 
-    // Handle navigation
     const handleNavigate = useCallback(
         (path: string) => {
             if (path !== '#') {
@@ -419,12 +396,10 @@ export default function Dashboard() {
 
     return (
         <div className="min-h-screen bg-gradient-offwhite-pink-blue relative overflow-hidden">
-            {/* Floating Decorative Elements */}
             <div className="absolute top-10 left-5 w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
             <div className="absolute bottom-10 right-5 w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-700" />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16 relative z-10">
-                {/* Welcome Section */}
                 <div className="mb-8 sm:mb-12 space-y-2">
                     <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold gradient-text">
                         Dashboard
@@ -435,13 +410,11 @@ export default function Dashboard() {
                     </p>
                 </div>
 
-                {/* Upload Area */}
                 <FileUploadZone
                     onFileSelect={handleFileSelect}
                     isUploading={isUploading}
                 />
 
-                {/* Documents List */}
                 <Card className="border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl relative overflow-hidden">
                     <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none" />
                     <CardHeader className="relative">
@@ -529,30 +502,48 @@ export default function Dashboard() {
                                                                 variant="outline"
                                                                 size="sm"
                                                                 onClick={() => {
-                                                                    window.open(
-                                                                        doc.fileUrl,
-                                                                        '_blank',
-                                                                    );
-                                                                    console.log(
-                                                                        '📥 Download URL:',
-                                                                        doc.fileUrl,
-                                                                    );
+                                                                    window.open(doc.fileUrl, '_blank');
                                                                 }}
                                                                 className="border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-green-400 dark:hover:border-green-500 transition-all font-semibold"
                                                             >
                                                                 <Download className="h-4 w-4 mr-2" />
-                                                                <span className="hidden sm:inline">
-                                                                    Download
-                                                                </span>
+                                                                <span className="hidden sm:inline">Download</span>
                                                             </Button>
                                                         )}
+
                                                         <DocumentActionButton
                                                             status={doc.status}
                                                             docId={doc.id}
-                                                            onNavigate={
-                                                                handleNavigate
-                                                            }
+                                                            onNavigate={handleNavigate}
                                                         />
+
+                                                        {doc.status === 'Completed' && (
+                                                            <>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.push(`/extraction-output?docId=${doc.id}`)
+                                                                    }
+                                                                    className="border-2 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-500 transition-all font-semibold"
+                                                                >
+                                                                    <FileSearch className="h-4 w-4 mr-2" />
+                                                                    <span className="hidden sm:inline">Extraction</span>
+                                                                </Button>
+
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.push(`/summarization-output?docId=${doc.id}`)
+                                                                    }
+                                                                    className="border-2 border-cyan-300 dark:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:border-cyan-500 transition-all font-semibold"
+                                                                >
+                                                                    <Sparkles className="h-4 w-4 mr-2" />
+                                                                    <span className="hidden sm:inline">Summarization</span>
+                                                                </Button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -565,7 +556,6 @@ export default function Dashboard() {
                 </Card>
             </main>
 
-            {/* Floating Action Button */}
             <div className="fixed bottom-8 right-8 z-50">
                 <label htmlFor="fab-upload" className="cursor-pointer group">
                     <div className="relative">
