@@ -31,7 +31,8 @@ export default function PDFViewerPage() {
   const { user } = useAuthStore();
   const docId = params.id as string;
 
-  const [document, setDocument] = useState<PDFDocument | null>(null);
+  // FIXED: Renamed from 'document' to 'pdfDocument' to avoid shadowing global document object
+  const [pdfDocument, setPdfDocument] = useState<PDFDocument | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<string>('');
 
@@ -63,7 +64,7 @@ export default function PDFViewerPage() {
               uploadDate: new Date(foundDoc.createdAt).toLocaleDateString()
             };
             
-            setDocument(doc);
+            setPdfDocument(doc);
             setPdfUrl(foundDoc.publicUrl);
           } else {
             toast.error('Document not found');
@@ -86,19 +87,19 @@ export default function PDFViewerPage() {
 
   // Handle PDF download
   const handleDownload = async () => {
-    if (!document) return;
+    if (!pdfDocument) return;
 
     try {
       // Create a temporary anchor element for download
-      const link = document.createElement('a');
+      const link = window.document.createElement('a');
       link.href = pdfUrl;
-      link.download = `${document.title}.pdf`;
+      link.download = `${pdfDocument.title}.pdf`;
       link.target = '_blank';
       
       // Append to body, click, and remove
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
       
       toast.success('PDF download started');
     } catch (error) {
@@ -120,7 +121,7 @@ export default function PDFViewerPage() {
     );
   }
 
-  if (!document) {
+  if (!pdfDocument) {
     return (
       <div className="min-h-screen bg-gradient-offwhite-pink-blue flex items-center justify-center">
         <Card className="w-full max-w-md mx-4">
@@ -156,10 +157,10 @@ export default function PDFViewerPage() {
               
               <div>
                 <h1 className="text-xl font-bold text-gray-900 truncate max-w-xs sm:max-w-md">
-                  {document.title}
+                  {pdfDocument.title}
                 </h1>
                 <p className="text-sm text-gray-600">
-                  Uploaded on {document.uploadDate}
+                  Uploaded on {pdfDocument.uploadDate}
                 </p>
               </div>
             </div>
@@ -185,7 +186,7 @@ export default function PDFViewerPage() {
               <iframe
                 src={`${pdfUrl}#toolbar=0`}
                 className="w-full h-full border-0"
-                title={document.title}
+                title={pdfDocument.title}
                 allow="fullscreen"
               />
             ) : (
@@ -212,7 +213,7 @@ export default function PDFViewerPage() {
                   Download a copy of this PDF to your device
                 </p>
                 <p className="text-xs text-gray-500">
-                  File: {document.title}.pdf
+                  File: {pdfDocument.title}.pdf
                 </p>
               </div>
               <Button

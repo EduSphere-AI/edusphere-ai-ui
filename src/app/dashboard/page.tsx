@@ -36,6 +36,7 @@ import { listUserFiles } from '@/lib/supabase';
 import { uploadFileWithMetadata } from '@/lib/upload-utils';
 import { saveFileMetadata } from '@/lib/firestore-client';
 import { toast } from 'sonner';
+import { UrlImportForm } from '@/components/url-import-form';
 
 interface Document {
     id: string;
@@ -446,6 +447,8 @@ export default function Dashboard() {
                     onFileSelect={handleFileSelect}
                     isUploading={isUploading}
                 />
+
+                <UrlImportForm className="mb-8 sm:mb-12 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl relative overflow-hidden" />
 
                 <Card className="border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl relative overflow-hidden">
                     <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none" />

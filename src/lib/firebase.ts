@@ -35,10 +35,9 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
-// Initialize Firebase app
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app =
+    getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Auth and Google Provider
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
