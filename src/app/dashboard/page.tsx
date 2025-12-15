@@ -2,6 +2,8 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FileSearch } from 'lucide-react';
+
 import {
     Card,
     CardContent,
@@ -208,7 +210,9 @@ const FileUploadZone = ({
                 <div
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
-                    className={`border-2 border-dashed border-blue-600 rounded-xl p-8 sm:p-12 text-center bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all ${isUploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} group relative overflow-hidden`}
+                    className={`border-2 border-dashed border-blue-600 rounded-xl p-8 sm:p-12 text-center bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all ${
+                        isUploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                    } group relative overflow-hidden`}
                 >
                     <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 to-cyan-500/5 pointer-events-none" />
                     <div className="flex flex-col items-center space-y-4 sm:space-y-6 relative z-10">
@@ -329,7 +333,9 @@ export default function Dashboard() {
 
             if (file.size > MAX_FILE_SIZE) {
                 toast.warning(
-                    `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB`,
+                    `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB. Your file is ${(file.size / 1024 / 1024).toFixed(
+                        2,
+                    )}MB`,
                 );
                 return;
             }
@@ -409,7 +415,9 @@ export default function Dashboard() {
             } catch (error) {
                 console.error('Upload error:', error);
                 toast.error(
-                    `Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    `Failed to upload file: ${
+                        error instanceof Error ? error.message : 'Unknown error'
+                    }`,
                 );
             } finally {
                 setIsUploading(false);
@@ -537,30 +545,48 @@ export default function Dashboard() {
                                                                 variant="outline"
                                                                 size="sm"
                                                                 onClick={() => {
-                                                                    window.open(
-                                                                        doc.fileUrl,
-                                                                        '_blank',
-                                                                    );
-                                                                    console.log(
-                                                                        '📥 Download URL:',
-                                                                        doc.fileUrl,
-                                                                    );
+                                                                    window.open(doc.fileUrl, '_blank');
                                                                 }}
                                                                 className="border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-green-400 dark:hover:border-green-500 transition-all font-semibold"
                                                             >
                                                                 <Download className="h-4 w-4 mr-2" />
-                                                                <span className="hidden sm:inline">
-                                                                    Download
-                                                                </span>
+                                                                <span className="hidden sm:inline">Download</span>
                                                             </Button>
                                                         )}
+
                                                         <DocumentActionButton
                                                             status={doc.status}
                                                             docId={doc.id}
-                                                            onNavigate={
-                                                                handleNavigate
-                                                            }
+                                                            onNavigate={handleNavigate}
                                                         />
+
+                                                        {doc.status === 'Completed' && (
+                                                            <>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.push(`/extraction-output?docId=${doc.id}`)
+                                                                    }
+                                                                    className="border-2 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-500 transition-all font-semibold"
+                                                                >
+                                                                    <FileSearch className="h-4 w-4 mr-2" />
+                                                                    <span className="hidden sm:inline">Extraction</span>
+                                                                </Button>
+
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.push(`/summarization-output?docId=${doc.id}`)
+                                                                    }
+                                                                    className="border-2 border-cyan-300 dark:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:border-cyan-500 transition-all font-semibold"
+                                                                >
+                                                                    <Sparkles className="h-4 w-4 mr-2" />
+                                                                    <span className="hidden sm:inline">Summarization</span>
+                                                                </Button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
