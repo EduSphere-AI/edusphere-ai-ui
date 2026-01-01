@@ -68,8 +68,9 @@ export function UrlImportForm({ className }: { className?: string }) {
             const docId = data.document_id;
             setDocumentId(docId);
 
-            // Connect to WebSocket
-            connectWebSocket(docId);
+            // Redirect immediately to processing page which listens to Firestore
+            toast.success('Upload successful, starting processing...');
+            window.location.href = `/processing/${docId}`;
         } catch (error) {
             console.error('Upload error:', error);
             setStatus('error');
@@ -81,57 +82,7 @@ export function UrlImportForm({ className }: { className?: string }) {
         }
     };
 
-    const connectWebSocket = (docId: string) => {
-        // Close existing connection if any
-        if (wsRef.current) {
-            wsRef.current.close();
-        }
-
-        const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/content/ws/${docId}`;
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-            console.log('WebSocket connected');
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const data: WebSocketMessage = JSON.parse(event.data);
-                setStatus(data.status);
-                setStatusMessage(data.message);
-
-                if (data.status === 'processing') {
-                    // Simulate progress or map steps to progress
-                    // If step is provided, we could map it to a percentage
-                    setProgress((prev) => {
-                        if (prev >= 90) return prev;
-                        return prev + 10;
-                    });
-                } else if (data.status === 'completed') {
-                    setProgress(100);
-                    setIsLoading(false);
-                    toast.success('Processing completed successfully!');
-                    ws.close();
-                } else if (data.status === 'error') {
-                    setIsLoading(false);
-                    toast.error(data.message || 'Processing failed');
-                    ws.close();
-                }
-            } catch (e) {
-                console.error('Error parsing WebSocket message:', e);
-            }
-        };
-
-        ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            // Don't necessarily fail everything on WS error, but maybe warn
-        };
-
-        ws.onclose = () => {
-            console.log('WebSocket disconnected');
-        };
-    };
+    // Removed connectWebSocket function as we use Firestore polling in the processing page
 
     // Cleanup on unmount
     useEffect(() => {

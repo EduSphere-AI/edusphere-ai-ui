@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import mockSummaryResult from '@/output/summarization/summary_result.json';
 import {
     DownloadIcon,
     SparklesIcon,
@@ -47,7 +48,7 @@ interface SummarizationData {
 ================================ */
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 );
 
 /* ================================
@@ -85,6 +86,22 @@ export default function SummarizationOutput() {
         }
 
         const fetchData = async () => {
+            if (documentId === 'doc-1') {
+                try {
+                    const normalized =
+                        normalizeSummarizationData(mockSummaryResult);
+                    setData(normalized);
+
+                    const slides = normalized.sections.flatMap(
+                        (section) => section.slides,
+                    );
+                    setAllSlides(slides);
+                } catch (err: any) {
+                    setError(err.message ?? 'Failed to load mock data');
+                }
+                return;
+            }
+
             try {
                 const { data, error } = await supabase
                     .from('summarization_results')
@@ -98,7 +115,7 @@ export default function SummarizationOutput() {
                 setData(normalized);
 
                 const slides = normalized.sections.flatMap(
-                    (section) => section.slides
+                    (section) => section.slides,
                 );
                 setAllSlides(slides);
             } catch (err: any) {
@@ -140,7 +157,10 @@ export default function SummarizationOutput() {
         return (
             <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50 to-cyan-50">
                 <div className="text-center">
-                    <SparklesIcon size={40} className="mx-auto mb-4 text-blue-600 animate-pulse" />
+                    <SparklesIcon
+                        size={40}
+                        className="mx-auto mb-4 text-blue-600 animate-pulse"
+                    />
                     <p className="font-bold text-gray-700">
                         Preparing your learning slides…
                     </p>
@@ -166,7 +186,7 @@ export default function SummarizationOutput() {
 
     const currentSlide = allSlides[currentSlideIndex];
     const currentSection = data!.sections.find(
-        (s) => s.section_index === currentSlide.section_index
+        (s) => s.section_index === currentSlide.section_index,
     );
     const isFirstSlideInSection = currentSlide.order_in_section === 1;
 
@@ -178,8 +198,6 @@ export default function SummarizationOutput() {
         /* I intentionally did NOT alter the rendering code */
         /* because your UI is already excellent */
         /* — EduSphere AI aesthetic preserved */
-        <>
-            {/* UI unchanged */}
-        </>
+        <>{/* UI unchanged */}</>
     );
 }

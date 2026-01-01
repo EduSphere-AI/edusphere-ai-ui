@@ -37,8 +37,11 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { listUserFiles } from '@/lib/supabase';
 import { uploadFileWithMetadata } from '@/lib/upload-utils';
 import { saveFileMetadata } from '@/lib/firestore-client';
+import { processDocument } from '@/lib/api';
 import { toast } from 'sonner';
 import { UrlImportForm } from '@/components/url-import-form';
+import { API_BASE_URL } from '@/lib/constants';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Document {
     id: string;
@@ -308,7 +311,16 @@ export default function Dashboard() {
                         }),
                     );
 
-                    setDocuments(formattedDocs);
+                    const mockDoc: Document = {
+                        id: 'doc-1',
+                        title: 'Document1',
+                        uploadDate: new Date().toISOString().split('T')[0],
+                        status: 'Completed',
+                        fileUrl: '#',
+                        filePath: 'mock/path',
+                    };
+
+                    setDocuments([mockDoc, ...formattedDocs]);
                 }
             } catch (error) {
                 console.error('Error fetching user files:', error);
@@ -353,9 +365,13 @@ export default function Dashboard() {
                     userId: user.id,
                 });
 
+                const docId = uuidv4();
+                console.log('🆔 Generated Document ID:', docId);
+
                 const uploadResult = await uploadFileWithMetadata(
                     file,
                     user.id,
+                    docId,
                 );
 
                 if (!uploadResult.success) {
@@ -409,13 +425,26 @@ export default function Dashboard() {
 
                 setDocuments((prev) => [newDoc, ...prev]);
 
-                toast.success(
-                    `File uploaded successfully!\n\nFirestore ID: ${firestoreSave.fileId}`,
-                );
+                // Trigger backend processing
+                if (uploadResult.publicUrl) {
+                    try {
+                        toast.info('Starting document processing...');
+                        await processDocument(
+                            uploadResult.publicUrl,
+                            user.id,
+                            newDoc.id,
+                        );
+                        toast.success('Processing started successfully!');
 
-                // setTimeout(() => {
-                //     router.push(`/processing/${newDoc.id}`);
-                // }, 1000);
+                        // Redirect to processing page
+                        setTimeout(() => {
+                            router.push(`/processing/${newDoc.id}`);
+                        }, 1000);
+                    } catch (error) {
+                        console.error('Failed to start processing:', error);
+                        toast.error('Failed to start processing on server');
+                    }
+                }
             } catch (error) {
                 console.error('Upload error:', error);
                 toast.error(
@@ -579,7 +608,7 @@ export default function Dashboard() {
                                                                     size="sm"
                                                                     onClick={() =>
                                                                         router.push(
-                                                                            `/extraction-output?docId=${doc.id}`,
+                                                                            `/extraction-output?doc=${doc.id}`,
                                                                         )
                                                                     }
                                                                     className="border-2 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-500 transition-all font-semibold"
@@ -595,7 +624,7 @@ export default function Dashboard() {
                                                                     size="sm"
                                                                     onClick={() =>
                                                                         router.push(
-                                                                            `/summarization-output?docId=${doc.id}`,
+                                                                            `/summarization-output?doc=${doc.id}`,
                                                                         )
                                                                     }
                                                                     className="border-2 border-cyan-300 dark:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:border-cyan-500 transition-all font-semibold"

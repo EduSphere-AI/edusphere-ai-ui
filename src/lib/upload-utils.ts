@@ -5,7 +5,7 @@ import { supabase, STORAGE_BUCKET } from './supabase';
 /**
  * Upload file directly to Supabase storage (client-side)
  */
-export async function uploadFileWithMetadata(file: File, userId: string) {
+export async function uploadFileWithMetadata(file: File, userId: string, docId?: string) {
     try {
         // Validate file
         if (!file.name.endsWith('.pdf')) {
@@ -33,7 +33,11 @@ export async function uploadFileWithMetadata(file: File, userId: string) {
 
         // Upload file to Supabase
         const timestamp = Date.now();
-        const fileName = `${userId}/${timestamp}-${file.name}`;
+        // If docId is provided, use it for structure: documents/{userId}/{docId}/source.pdf
+        // Otherwise fallback to old: {userId}/{timestamp}-{filename}
+        const fileName = docId 
+            ? `documents/${userId}/${docId}/source.pdf`
+            : `${userId}/${timestamp}-${file.name}`;
 
         const { data, error } = await supabase.storage
             .from(STORAGE_BUCKET)

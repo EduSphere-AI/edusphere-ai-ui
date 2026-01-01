@@ -18,6 +18,7 @@ import {
     AlertCircleIcon,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import mockExtractionResult from '@/output/extraction/extraction_result.json';
 
 /* ================================
    Types (UNCHANGED)
@@ -66,7 +67,7 @@ interface ExtractionData {
 ================================ */
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 );
 
 /* ================================
@@ -100,7 +101,9 @@ export default function ExtractionOutput() {
     const [data, setData] = useState<ExtractionData | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [selectedPage, setSelectedPage] = useState<number | null>(null);
-    const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'sections'>('overview');
+    const [activeTab, setActiveTab] = useState<
+        'overview' | 'pages' | 'sections'
+    >('overview');
 
     /* ================================
        AUTO FETCH FROM SERVER
@@ -112,6 +115,21 @@ export default function ExtractionOutput() {
         }
 
         const fetchData = async () => {
+            if (documentId === 'doc-1') {
+                try {
+                    const normalized =
+                        normalizeExtractionData(mockExtractionResult);
+                    setData(normalized);
+
+                    if (normalized.pages?.length) {
+                        setSelectedPage(normalized.pages[0].page_number);
+                    }
+                } catch (err: any) {
+                    setError(err.message ?? 'Failed to load mock data');
+                }
+                return;
+            }
+
             try {
                 const { data, error } = await supabase
                     .from('extraction_results')
@@ -142,7 +160,10 @@ export default function ExtractionOutput() {
         return (
             <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50 to-cyan-50">
                 <div className="text-center">
-                    <SparklesIcon className="mx-auto mb-4 text-blue-600" size={48} />
+                    <SparklesIcon
+                        className="mx-auto mb-4 text-blue-600"
+                        size={48}
+                    />
                     <p className="font-semibold text-gray-700">
                         Processing extraction results…
                     </p>
