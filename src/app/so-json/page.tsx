@@ -1,20 +1,49 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import {
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    CardDescription,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Download, Sparkles, CheckCircle, Loader2 } from 'lucide-react';
+import {
+    FileText,
+    Download,
+    Sparkles,
+    CheckCircle,
+    Loader2,
+} from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 // Content element types that backend can send
-type ContentType = 'h1' | 'h2' | 'h3' | 'p' | 'ul' | 'ol' | 'text';
+type ContentType =
+    | 'h1'
+    | 'h2'
+    | 'h3'
+    | 'p'
+    | 'ul'
+    | 'ol'
+    | 'text'
+    | 'image'
+    | 'figure'
+    | 'table';
 
 interface ContentElement {
     type: ContentType;
     content: string | string[]; // string for text/headers, array for lists
     style?: 'bold' | 'italic' | 'highlight'; // optional styling
+    metadata?: {
+        image_url?: string;
+        url?: string;
+        caption?: string;
+        table_data?: string[][];
+        table_headers?: string[];
+    };
 }
 
 interface Slide {
@@ -40,65 +69,152 @@ const ContentRenderer = ({ element }: { element: ContentElement }) => {
 
     // Apply styling classes
     const getStyleClass = () => {
-        if (style === 'bold') return 'font-bold text-blue-600 dark:text-blue-400';
+        if (style === 'bold')
+            return 'font-bold text-blue-600 dark:text-blue-400';
         if (style === 'italic') return 'italic';
-        if (style === 'highlight') return 'bg-yellow-100 dark:bg-yellow-900/30 px-1 rounded';
+        if (style === 'highlight')
+            return 'bg-yellow-100 dark:bg-yellow-900/30 px-1 rounded';
         return '';
     };
 
     switch (type) {
         case 'h1':
             return (
-                <h1 className={`text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 ${getStyleClass()}`}>
+                <h1
+                    className={`text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 ${getStyleClass()}`}
+                >
                     {content as string}
                 </h1>
             );
-        
+
         case 'h2':
             return (
-                <h2 className={`text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 ${getStyleClass()}`}>
+                <h2
+                    className={`text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 ${getStyleClass()}`}
+                >
                     {content as string}
                 </h2>
             );
-        
+
         case 'h3':
             return (
-                <h3 className={`text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200 mt-4 mb-3 ${getStyleClass()}`}>
+                <h3
+                    className={`text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200 mt-4 mb-3 ${getStyleClass()}`}
+                >
                     {content as string}
                 </h3>
             );
-        
+
         case 'p':
         case 'text':
             return (
-                <p className={`text-gray-700 dark:text-gray-300 mb-4 leading-relaxed ${getStyleClass()}`}>
+                <p
+                    className={`text-gray-700 dark:text-gray-300 mb-4 leading-relaxed ${getStyleClass()}`}
+                >
                     {content as string}
                 </p>
             );
-        
+
         case 'ul':
             return (
                 <ul className="space-y-2 mb-4">
                     {(content as string[]).map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-3 text-gray-700 dark:text-gray-300">
+                        <li
+                            key={idx}
+                            className="flex items-start gap-3 text-gray-700 dark:text-gray-300"
+                        >
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-2 flex-shrink-0" />
                             <span>{item}</span>
                         </li>
                     ))}
                 </ul>
             );
-        
+
         case 'ol':
             return (
                 <ol className="space-y-2 mb-4 list-decimal list-inside">
                     {(content as string[]).map((item, idx) => (
-                        <li key={idx} className="text-gray-700 dark:text-gray-300 ml-2">
+                        <li
+                            key={idx}
+                            className="text-gray-700 dark:text-gray-300 ml-2"
+                        >
                             {item}
                         </li>
                     ))}
                 </ol>
             );
-        
+
+        case 'image':
+        case 'figure':
+            const imageUrl =
+                element.metadata?.image_url ||
+                element.metadata?.url ||
+                (content as string);
+            if (!imageUrl || imageUrl.length < 5) return null; // Basic validation
+
+            return (
+                <div className="my-6 flex flex-col items-center">
+                    <div className="rounded-xl overflow-hidden shadow-md border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 max-w-full">
+                        <img
+                            src={imageUrl}
+                            alt={element.metadata?.caption || 'Slide image'}
+                            className="max-h-[400px] w-auto object-contain"
+                            loading="lazy"
+                        />
+                    </div>
+                    {element.metadata?.caption && (
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 italic">
+                            {element.metadata.caption}
+                        </p>
+                    )}
+                </div>
+            );
+
+        case 'table':
+            if (!element.metadata?.table_data) return null;
+
+            return (
+                <div className="my-6 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                    {element.metadata.caption && (
+                        <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 italic">
+                            {element.metadata.caption}
+                        </div>
+                    )}
+                    <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300">
+                        {element.metadata.table_headers && (
+                            <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-100 dark:bg-gray-800">
+                                <tr>
+                                    {element.metadata.table_headers.map(
+                                        (h, i) => (
+                                            <th
+                                                key={i}
+                                                className="px-6 py-3 font-semibold border-b border-gray-200 dark:border-gray-700"
+                                            >
+                                                {h}
+                                            </th>
+                                        ),
+                                    )}
+                                </tr>
+                            </thead>
+                        )}
+                        <tbody>
+                            {element.metadata.table_data.map((row, i) => (
+                                <tr
+                                    key={i}
+                                    className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                                >
+                                    {row.map((cell, j) => (
+                                        <td key={j} className="px-6 py-4">
+                                            {cell}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+
         default:
             return null;
     }
@@ -117,7 +233,8 @@ const mockSlidesData: Chapter[] = [
                 elements: [
                     {
                         type: 'p',
-                        content: 'Machine Learning is a subset of Artificial Intelligence that enables systems to learn and improve from experience without being explicitly programmed.',
+                        content:
+                            'Machine Learning is a subset of Artificial Intelligence that enables systems to learn and improve from experience without being explicitly programmed.',
                     },
                     {
                         type: 'h3',
@@ -138,7 +255,8 @@ const mockSlidesData: Chapter[] = [
                 elements: [
                     {
                         type: 'p',
-                        content: 'Machine Learning has transformed how we approach problems in various domains.',
+                        content:
+                            'Machine Learning has transformed how we approach problems in various domains.',
                     },
                     {
                         type: 'h3',
@@ -170,12 +288,22 @@ const mockSlidesData: Chapter[] = [
         questionnaire: [
             {
                 question: 'Machine Learning is a subset of which field?',
-                options: ['Databases', 'Artificial Intelligence', 'Networking', 'Cloud Computing'],
+                options: [
+                    'Databases',
+                    'Artificial Intelligence',
+                    'Networking',
+                    'Cloud Computing',
+                ],
                 correctAnswer: 1,
             },
             {
                 question: 'What enables ML systems to improve?',
-                options: ['Hard-coded rules', 'Data and experience', 'Manual updates', 'Static algorithms'],
+                options: [
+                    'Hard-coded rules',
+                    'Data and experience',
+                    'Manual updates',
+                    'Static algorithms',
+                ],
                 correctAnswer: 1,
             },
         ],
@@ -188,7 +316,8 @@ const mockSlidesData: Chapter[] = [
                 elements: [
                     {
                         type: 'p',
-                        content: 'Supervised learning is a type of machine learning where the model is trained on labeled data.',
+                        content:
+                            'Supervised learning is a type of machine learning where the model is trained on labeled data.',
                     },
                     {
                         type: 'h3',
@@ -219,6 +348,15 @@ const mockSlidesData: Chapter[] = [
                         ],
                     },
                     {
+                        type: 'figure',
+                        content: 'Classification Example',
+                        metadata: {
+                            image_url:
+                                'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Iris_machine_learning.png/440px-Iris_machine_learning.png',
+                            caption: 'Figure 1: Iris Flower Classification',
+                        },
+                    },
+                    {
                         type: 'h3',
                         content: '2. Regression',
                     },
@@ -229,18 +367,61 @@ const mockSlidesData: Chapter[] = [
                             'Example: House price prediction',
                         ],
                     },
+                    {
+                        type: 'table',
+                        content: 'Comparison',
+                        metadata: {
+                            caption: 'Comparison of Learning Types',
+                            table_headers: [
+                                'Type',
+                                'Input',
+                                'Output',
+                                'Example',
+                            ],
+                            table_data: [
+                                [
+                                    'Classification',
+                                    'Labeled',
+                                    'Discrete Class',
+                                    'Spam Detection',
+                                ],
+                                [
+                                    'Regression',
+                                    'Labeled',
+                                    'Continuous Value',
+                                    'Price Prediction',
+                                ],
+                                [
+                                    'Clustering',
+                                    'Unlabeled',
+                                    'Groups',
+                                    'Customer Segmentation',
+                                ],
+                            ],
+                        },
+                    },
                 ],
             },
         ],
         questionnaire: [
             {
                 question: 'Supervised learning requires:',
-                options: ['Unlabeled data', 'Labeled data', 'No data', 'Random data'],
+                options: [
+                    'Unlabeled data',
+                    'Labeled data',
+                    'No data',
+                    'Random data',
+                ],
                 correctAnswer: 1,
             },
             {
                 question: 'Which is an example of classification?',
-                options: ['Stock price prediction', 'Spam detection', 'Temperature forecasting', 'Sales prediction'],
+                options: [
+                    'Stock price prediction',
+                    'Spam detection',
+                    'Temperature forecasting',
+                    'Sales prediction',
+                ],
                 correctAnswer: 1,
             },
         ],
@@ -250,10 +431,12 @@ const mockSlidesData: Chapter[] = [
 export default function SlidesOutputJSONPage() {
     const searchParams = useSearchParams();
     const docId = searchParams.get('doc');
-    
+
     const [chapters, setChapters] = useState<Chapter[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
+    const [selectedAnswers, setSelectedAnswers] = useState<
+        Record<string, number>
+    >({});
 
     useEffect(() => {
         const fetchSlides = async () => {
@@ -267,9 +450,9 @@ export default function SlidesOutputJSONPage() {
                 // const response = await fetch(`/api/slides/${docId}`);
                 // const data = await response.json();
                 // setChapters(data.chapters);
-                
+
                 // Mock delay to simulate API call
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise((resolve) => setTimeout(resolve, 1000));
                 setChapters(mockSlidesData);
             } catch (error) {
                 console.error('Error fetching slides:', error);
@@ -281,9 +464,13 @@ export default function SlidesOutputJSONPage() {
         fetchSlides();
     }, [docId]);
 
-    const handleAnswerSelect = (chapterIndex: number, questionIndex: number, optionIndex: number) => {
+    const handleAnswerSelect = (
+        chapterIndex: number,
+        questionIndex: number,
+        optionIndex: number,
+    ) => {
         const key = `${chapterIndex}-${questionIndex}`;
-        setSelectedAnswers(prev => ({
+        setSelectedAnswers((prev) => ({
             ...prev,
             [key]: optionIndex,
         }));
@@ -294,7 +481,9 @@ export default function SlidesOutputJSONPage() {
             <div className="min-h-screen bg-gradient-offwhite-pink-blue flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="h-12 w-12 text-blue-600 animate-spin" />
-                    <p className="text-gray-600 dark:text-gray-400 font-semibold">Loading slides...</p>
+                    <p className="text-gray-600 dark:text-gray-400 font-semibold">
+                        Loading slides...
+                    </p>
                 </div>
             </div>
         );
@@ -313,7 +502,8 @@ export default function SlidesOutputJSONPage() {
                         Slide Deck
                     </h1>
                     <p className="text-gray-700 dark:text-gray-300 text-base sm:text-lg font-medium">
-                        Here are your generated slides with interactive questionnaires!
+                        Here are your generated slides with interactive
+                        questionnaires!
                     </p>
                 </div>
 
@@ -331,7 +521,8 @@ export default function SlidesOutputJSONPage() {
                                         Slide Deck Overview
                                     </CardTitle>
                                     <CardDescription className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
-                                        Complete learning materials with interactive elements
+                                        Complete learning materials with
+                                        interactive elements
                                     </CardDescription>
                                 </div>
                             </div>
@@ -356,7 +547,7 @@ export default function SlidesOutputJSONPage() {
                             className="border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl relative overflow-hidden"
                         >
                             <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none" />
-                            
+
                             <CardHeader className="relative">
                                 <div className="flex items-center space-x-3 mb-2">
                                     <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-linear-to-br from-blue-600 to-cyan-600 rounded-xl shadow-lg">
@@ -370,7 +561,8 @@ export default function SlidesOutputJSONPage() {
                                     {chapter.chapterTitle}
                                 </CardTitle>
                                 <CardDescription className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
-                                    {chapter.slides.length} slides • {chapter.questionnaire.length} questions
+                                    {chapter.slides.length} slides •{' '}
+                                    {chapter.questionnaire.length} questions
                                 </CardDescription>
                             </CardHeader>
 
@@ -383,7 +575,7 @@ export default function SlidesOutputJSONPage() {
                                             Slides
                                         </h3>
                                     </div>
-                                    
+
                                     {chapter.slides.map((slide, slideIndex) => (
                                         <Card
                                             key={slideIndex}
@@ -403,9 +595,19 @@ export default function SlidesOutputJSONPage() {
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="space-y-2">
-                                                    {slide.elements.map((element, elemIndex) => (
-                                                        <ContentRenderer key={elemIndex} element={element} />
-                                                    ))}
+                                                    {slide.elements.map(
+                                                        (
+                                                            element,
+                                                            elemIndex,
+                                                        ) => (
+                                                            <ContentRenderer
+                                                                key={elemIndex}
+                                                                element={
+                                                                    element
+                                                                }
+                                                            />
+                                                        ),
+                                                    )}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -426,8 +628,9 @@ export default function SlidesOutputJSONPage() {
 
                                     {chapter.questionnaire.map((q, qIndex) => {
                                         const key = `${chapterIndex}-${qIndex}`;
-                                        const selectedAnswer = selectedAnswers[key];
-                                        
+                                        const selectedAnswer =
+                                            selectedAnswers[key];
+
                                         return (
                                             <Card
                                                 key={qIndex}
@@ -443,23 +646,38 @@ export default function SlidesOutputJSONPage() {
                                                         </p>
                                                     </div>
                                                     <div className="grid gap-2 ml-0 sm:ml-12">
-                                                        {q.options.map((opt, optIndex) => (
-                                                            <Button
-                                                                key={optIndex}
-                                                                variant="outline"
-                                                                onClick={() => handleAnswerSelect(chapterIndex, qIndex, optIndex)}
-                                                                className={`justify-start border-2 transition-all font-medium text-sm sm:text-base text-left h-auto py-3 ${
-                                                                    selectedAnswer === optIndex
-                                                                        ? 'bg-cyan-100 dark:bg-cyan-900/30 border-cyan-500 dark:border-cyan-500'
-                                                                        : 'border-gray-300 dark:border-gray-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:border-cyan-400 dark:hover:border-cyan-500'
-                                                                }`}
-                                                            >
-                                                                <span className="mr-3 text-gray-500 dark:text-gray-400 font-semibold">
-                                                                    {String.fromCharCode(65 + optIndex)}.
-                                                                </span>
-                                                                {opt}
-                                                            </Button>
-                                                        ))}
+                                                        {q.options.map(
+                                                            (opt, optIndex) => (
+                                                                <Button
+                                                                    key={
+                                                                        optIndex
+                                                                    }
+                                                                    variant="outline"
+                                                                    onClick={() =>
+                                                                        handleAnswerSelect(
+                                                                            chapterIndex,
+                                                                            qIndex,
+                                                                            optIndex,
+                                                                        )
+                                                                    }
+                                                                    className={`justify-start border-2 transition-all font-medium text-sm sm:text-base text-left h-auto py-3 ${
+                                                                        selectedAnswer ===
+                                                                        optIndex
+                                                                            ? 'bg-cyan-100 dark:bg-cyan-900/30 border-cyan-500 dark:border-cyan-500'
+                                                                            : 'border-gray-300 dark:border-gray-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:border-cyan-400 dark:hover:border-cyan-500'
+                                                                    }`}
+                                                                >
+                                                                    <span className="mr-3 text-gray-500 dark:text-gray-400 font-semibold">
+                                                                        {String.fromCharCode(
+                                                                            65 +
+                                                                                optIndex,
+                                                                        )}
+                                                                        .
+                                                                    </span>
+                                                                    {opt}
+                                                                </Button>
+                                                            ),
+                                                        )}
                                                     </div>
                                                 </CardContent>
                                             </Card>

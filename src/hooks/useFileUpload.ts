@@ -41,7 +41,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
     });
 
     const upload = useCallback(
-        async (file: File, userId: string) => {
+        async (file: File) => {
             setState({
                 isUploading: true,
                 progress: 0,
@@ -74,7 +74,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 
                 setState((prev) => ({ ...prev, progress: 25 }));
 
-                const result = await uploadFileWithMetadata(file, userId);
+                const result = await uploadFileWithMetadata(file);
 
                 if (!result.success) {
                     throw new Error(result.error || 'Upload failed');

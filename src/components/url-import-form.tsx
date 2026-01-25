@@ -12,7 +12,7 @@ import {
     Link as LinkIcon,
     ArrowRight,
 } from 'lucide-react';
-import { useAuthStore } from '@/store/auth.store';
+// import { useAuthStore } from '@/store/auth.store'; // Removed
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -33,15 +33,15 @@ export function UrlImportForm({ className }: { className?: string }) {
     const [statusMessage, setStatusMessage] = useState('');
     const [documentId, setDocumentId] = useState<string | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
-    const { user } = useAuthStore();
+    // const { user } = useAuthStore(); // Auth removed
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!url) return;
-        if (!user) {
+        /*if (!user) {
             toast.error('You must be logged in to process URLs');
             return;
-        }
+        }*/
 
         setIsLoading(true);
         setStatus('processing');
@@ -56,7 +56,7 @@ export function UrlImportForm({ className }: { className?: string }) {
                 },
                 body: JSON.stringify({
                     url,
-                    user_id: user.id,
+                    // user_id removed
                 }),
             });
 

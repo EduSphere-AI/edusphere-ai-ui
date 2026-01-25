@@ -3,7 +3,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FileSearch } from 'lucide-react';
-
 import {
     Card,
     CardContent,
@@ -19,7 +18,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { useAuthStore } from '@/store/auth.store';
 import {
     Upload,
     FileText,
@@ -28,19 +26,14 @@ import {
     XCircle,
     Eye,
     Sparkles,
-    Plus,
-    Download,
     Loader2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { listUserFiles } from '@/lib/supabase';
 import { uploadFileWithMetadata } from '@/lib/upload-utils';
 import { saveFileMetadata } from '@/lib/firestore-client';
-import { processDocument } from '@/lib/api';
+import { processDocument, fetchDocuments } from '@/lib/api';
 import { toast } from 'sonner';
-import { UrlImportForm } from '@/components/url-import-form';
-import { API_BASE_URL } from '@/lib/constants';
 import { v4 as uuidv4 } from 'uuid';
 
 interface Document {
@@ -99,14 +92,17 @@ const StatusBadge = ({ status }: { status: DocumentStatus }) => {
     const Icon = config.icon;
 
     return (
-        <Badge className={`${config.className} shadow-md font-semibold`}>
-            <Icon className="h-3 w-3 mr-1" />
+        <Badge
+            variant="outline"
+            className={`${config.className} px-3 py-1 flex items-center gap-2`}
+        >
+            <Icon className="h-3 w-3" />
             {config.label}
         </Badge>
     );
 };
 
-const DocumentActionButton = ({
+const ActionButton = ({
     status,
     docId,
     onNavigate,
@@ -219,14 +215,9 @@ const FileUploadZone = ({
                             : 'cursor-pointer'
                     } group relative overflow-hidden`}
                 >
-                    <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 to-cyan-500/5 pointer-events-none" />
-                    <div className="flex flex-col items-center space-y-4 sm:space-y-6 relative z-10">
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg animate-bounce-slow">
-                            {isUploading ? (
-                                <Loader2 className="h-7 w-7 sm:h-8 sm:w-8 text-white animate-spin" />
-                            ) : (
-                                <Upload className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
-                            )}
+                    <div className="relative z-10">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
+                            <Upload className="h-8 w-8 sm:h-10 sm:w-10 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="space-y-2">
                             <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -280,66 +271,46 @@ const FileUploadZone = ({
 
 export default function Dashboard() {
     const router = useRouter();
-    const { user } = useAuthStore();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [isUploading, setIsUploading] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
 
     const documentCount = useMemo(() => documents.length, [documents.length]);
 
     useEffect(() => {
-        const fetchUserFiles = async () => {
-            if (!user) {
-                setIsLoading(false);
-                return;
-            }
-
+        const loadDocuments = async () => {
             try {
-                const result = await listUserFiles(user.id);
-
-                if (result.success && result.files) {
-                    const formattedDocs: Document[] = result.files.map(
-                        (file) => ({
-                            id: file.id,
-                            title: extractOriginalFilename(file.name),
-                            uploadDate: new Date(file.createdAt)
-                                .toISOString()
-                                .split('T')[0],
-                            status: 'Completed',
-                            fileUrl: file.publicUrl,
-                            filePath: file.path,
-                        }),
-                    );
-
-                    const mockDoc: Document = {
-                        id: 'doc-1',
-                        title: 'Document1',
-                        uploadDate: new Date().toISOString().split('T')[0],
-                        status: 'Completed',
-                        fileUrl: '#',
-                        filePath: 'mock/path',
-                    };
-
-                    setDocuments([mockDoc, ...formattedDocs]);
-                }
+                const docs = await fetchDocuments();
+                // Map backend format to frontend Document interface
+                const mappedDocs: Document[] = docs.map((d: any) => ({
+                    id: d.id,
+                    title: d.filename
+                        ? d.filename.replace(/^\d+-/, '')
+                        : 'Untitled',
+                    uploadDate: d.upload_date
+                        ? new Date(d.upload_date).toLocaleDateString()
+                        : 'Unknown',
+                    status: (d.status === 'completed'
+                        ? 'Completed'
+                        : d.status === 'error'
+                          ? 'Error'
+                          : 'Processing') as DocumentStatus,
+                    fileUrl: d.source_url,
+                    filePath: '',
+                }));
+                setDocuments(mappedDocs);
             } catch (error) {
-                console.error('Error fetching user files:', error);
-                toast.error('Failed to load your files');
-            } finally {
-                setIsLoading(false);
+                console.error('Failed to load documents', error);
+
+                // Keep local state if available or empty
+                setDocuments([]);
             }
         };
 
-        fetchUserFiles();
-    }, [user]);
+        loadDocuments();
+    }, []);
 
     const handleFileSelect = useCallback(
         async (file: File) => {
-            if (!user) {
-                toast.error('Please log in to upload files');
-                return;
-            }
-
             if (!file.name.endsWith('.pdf')) {
                 toast.warning('Please upload a PDF file');
                 return;
@@ -362,17 +333,12 @@ export default function Dashboard() {
                 console.log('Uploading file to Supabase...', {
                     fileName: file.name,
                     fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-                    userId: user.id,
                 });
 
                 const docId = uuidv4();
                 console.log('🆔 Generated Document ID:', docId);
 
-                const uploadResult = await uploadFileWithMetadata(
-                    file,
-                    user.id,
-                    docId,
-                );
+                const uploadResult = await uploadFileWithMetadata(file, docId);
 
                 if (!uploadResult.success) {
                     throw new Error(uploadResult.error || 'Upload failed');
@@ -390,9 +356,8 @@ export default function Dashboard() {
                 console.log('📥 File Download URL:', uploadResult.publicUrl);
                 console.log('🔥 File ID:', uploadResult.fileId);
 
-                // Save file metadata to Firestore
+                // Save file metadata to Firestore (no userId)
                 const firestoreSave = await saveFileMetadata({
-                    userId: user.id,
                     fileName: uploadResult.fileName || file.name,
                     originalFileName: file.name,
                     fileSize: file.size,
@@ -431,7 +396,6 @@ export default function Dashboard() {
                         toast.info('Starting document processing...');
                         await processDocument(
                             uploadResult.publicUrl,
-                            user.id,
                             newDoc.id,
                         );
                         toast.success('Processing started successfully!');
@@ -456,7 +420,7 @@ export default function Dashboard() {
                 setIsUploading(false);
             }
         },
-        [router, user],
+        [router],
     );
 
     const handleNavigate = useCallback(
@@ -478,9 +442,8 @@ export default function Dashboard() {
                     <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold gradient-text">
                         Dashboard
                     </h1>
-                    <p className="text-gray-700 dark:text-gray-300 text-base sm:text-lg font-medium">
-                        Upload academic papers and transform them into teaching
-                        materials instantly
+                    <p className="text-gray-600 dark:text-gray-400 text-lg">
+                        Upload your academic papers and track processing status
                     </p>
                 </div>
 
@@ -489,81 +452,53 @@ export default function Dashboard() {
                     isUploading={isUploading}
                 />
 
-                {/* <UrlImportForm className="mb-8 sm:mb-12 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl relative overflow-hidden" /> */}
-
-                <Card className="border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl relative overflow-hidden">
-                    <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none" />
-                    <CardHeader className="relative">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                            <div>
-                                <CardTitle className="text-xl sm:text-2xl text-gray-900 dark:text-gray-100">
-                                    Uploaded Documents
-                                </CardTitle>
-                                <CardDescription className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
-                                    View and manage your uploaded academic
-                                    articles
-                                </CardDescription>
-                            </div>
-                            <Badge className="w-fit bg-linear-to-r from-blue-600 to-cyan-600 text-white text-sm sm:text-base px-4 py-2 shadow-lg">
-                                {documentCount}{' '}
-                                {documentCount === 1 ? 'Document' : 'Documents'}
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold flex items-center gap-2">
+                            <FileSearch className="w-6 h-6 text-blue-600" />
+                            Recent Documents
+                            <Badge variant="secondary" className="ml-2">
+                                {documentCount}
                             </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="relative">
-                        <div className="overflow-x-auto">
-                            {isLoading ? (
-                                <div className="flex flex-col items-center justify-center py-12">
-                                    <Loader2 className="h-8 w-8 text-blue-600 animate-spin mb-4" />
-                                    <p className="text-gray-600 dark:text-gray-400 text-sm">
-                                        Loading your documents...
-                                    </p>
-                                </div>
-                            ) : documents.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-12">
-                                    <FileText className="h-12 w-12 text-gray-400 mb-4" />
-                                    <p className="text-gray-600 dark:text-gray-400 text-base font-semibold mb-2">
-                                        No documents uploaded yet
-                                    </p>
-                                    <p className="text-gray-500 dark:text-gray-500 text-sm">
-                                        Upload your first PDF to get started
-                                    </p>
-                                </div>
-                            ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow className="hover:bg-transparent border-gray-200 dark:border-gray-700">
-                                            <TableHead className="text-gray-700 dark:text-gray-300 font-bold">
-                                                Title
-                                            </TableHead>
-                                            <TableHead className="text-gray-700 dark:text-gray-300 font-bold">
-                                                Upload Date
-                                            </TableHead>
-                                            <TableHead className="text-gray-700 dark:text-gray-300 font-bold">
-                                                Status
-                                            </TableHead>
-                                            <TableHead className="text-right text-gray-700 dark:text-gray-300 font-bold">
-                                                Actions
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {documents.map((doc) => (
-                                            <TableRow
-                                                key={doc.id}
-                                                className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-gray-200 dark:border-gray-700"
+                        </h2>
+                    </div>
+
+                    <Card className="border-2 border-gray-200 dark:border-gray-700 shadow-md">
+                        <CardContent className="p-0">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
+                                        <TableHead className="w-[40%] pl-6">
+                                            Document Name
+                                        </TableHead>
+                                        <TableHead>Upload Date</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right pr-6">
+                                            Actions
+                                        </TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {documents.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={4}
+                                                className="h-32 text-center text-gray-500"
                                             >
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-3">
-                                                        <div className="w-10 h-10 flex items-center justify-center bg-linear-to-br from-blue-600 to-cyan-600 rounded-lg shadow-md">
-                                                            <FileText className="h-5 w-5 text-white" />
-                                                        </div>
-                                                        <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base">
-                                                            {doc.title}
-                                                        </span>
+                                                No documents uploaded yet. Start
+                                                by uploading a PDF above.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        documents.map((doc) => (
+                                            <TableRow key={doc.id}>
+                                                <TableCell className="font-medium pl-6">
+                                                    <div className="flex items-center gap-2">
+                                                        <FileText className="w-4 h-4 text-gray-400" />
+                                                        {doc.title}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
+                                                <TableCell>
                                                     {doc.uploadDate}
                                                 </TableCell>
                                                 <TableCell>
@@ -571,113 +506,24 @@ export default function Dashboard() {
                                                         status={doc.status}
                                                     />
                                                 </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        {doc.fileUrl && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    window.open(
-                                                                        doc.fileUrl,
-                                                                        '_blank',
-                                                                    );
-                                                                }}
-                                                                className="border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-green-400 dark:hover:border-green-500 transition-all font-semibold"
-                                                            >
-                                                                <Download className="h-4 w-4 mr-2" />
-                                                                <span className="hidden sm:inline">
-                                                                    Download
-                                                                </span>
-                                                            </Button>
-                                                        )}
-
-                                                        <DocumentActionButton
-                                                            status={doc.status}
-                                                            docId={doc.id}
-                                                            onNavigate={
-                                                                handleNavigate
-                                                            }
-                                                        />
-
-                                                        {doc.status ===
-                                                            'Completed' && (
-                                                            <>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        router.push(
-                                                                            `/extraction-output?doc=${doc.id}`,
-                                                                        )
-                                                                    }
-                                                                    className="border-2 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-500 transition-all font-semibold"
-                                                                >
-                                                                    <FileSearch className="h-4 w-4 mr-2" />
-                                                                    <span className="hidden sm:inline">
-                                                                        Extraction
-                                                                    </span>
-                                                                </Button>
-
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        router.push(
-                                                                            `/summarization-output?doc=${doc.id}`,
-                                                                        )
-                                                                    }
-                                                                    className="border-2 border-cyan-300 dark:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:border-cyan-500 transition-all font-semibold"
-                                                                >
-                                                                    <Sparkles className="h-4 w-4 mr-2" />
-                                                                    <span className="hidden sm:inline">
-                                                                        Summarization
-                                                                    </span>
-                                                                </Button>
-                                                            </>
-                                                        )}
-                                                    </div>
+                                                <TableCell className="text-right pr-6">
+                                                    <ActionButton
+                                                        status={doc.status}
+                                                        docId={doc.id}
+                                                        onNavigate={
+                                                            handleNavigate
+                                                        }
+                                                    />
                                                 </TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </div>
             </main>
-
-            <div className="fixed bottom-8 right-8 z-50">
-                <label htmlFor="fab-upload" className="cursor-pointer group">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-linear-to-r from-blue-600 to-cyan-600 rounded-full blur-xl opacity-50 group-hover:opacity-100 transition-opacity" />
-                        <Button
-                            size="lg"
-                            className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-linear-to-r from-blue-600 to-cyan-600 hover:scale-110 active:scale-95 shadow-2xl transition-transform"
-                            asChild
-                        >
-                            <span>
-                                <Plus className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
-                            </span>
-                        </Button>
-                    </div>
-                    <input
-                        id="fab-upload"
-                        type="file"
-                        accept={ACCEPTED_FILE_TYPES}
-                        disabled={isUploading}
-                        onChange={(e) => {
-                            const files = e.target.files;
-                            if (files && files.length > 0) {
-                                handleFileSelect(files[0]);
-                            }
-                        }}
-                        className="hidden"
-                        aria-label="Quick upload PDF file"
-                    />
-                </label>
-            </div>
         </div>
     );
 }

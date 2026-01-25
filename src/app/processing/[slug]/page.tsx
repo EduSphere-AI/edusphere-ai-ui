@@ -40,60 +40,73 @@ export default function ProcessingPage({
     useEffect(() => {
         if (!documentId) return;
 
-        console.log('Listening to document:', documentId);
+        // The backend `process_full_pipeline` creates a job with ID `job_${documentId}`
+        const jobId = `job_${documentId}`;
+        console.log('Listening to job:', jobId);
 
-        const docRef = doc(db, 'documents', documentId);
-        const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
-            if (docSnapshot.exists()) {
-                const data = docSnapshot.data();
-                console.log('Firestore Update:', data);
+        const jobRef = doc(db, 'jobs', jobId);
+        const unsubscribe = onSnapshot(
+            jobRef,
+            (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    const data = docSnapshot.data();
+                    console.log('Firestore Job Update:', data);
 
-                setStatus({
-                    status: data.status,
-                    step: data.current_step || data.step, // Handle both naming conventions
-                    message: data.message || 'Processing...',
-                });
+                    setStatus({
+                        status: data.status,
+                        step: data.stage,
+                        message: data.message || 'Processing...',
+                    });
 
-                if (data.progress !== undefined) {
-                    setProgress(data.progress);
-                } else {
-                    // Fallback progress if not explicitly set
-                    switch (data.current_step) {
-                        case 'starting':
-                            setProgress(5);
-                            break;
-                        case 'extraction':
-                            setProgress(20);
-                            break;
-                        case 'summarization':
-                            setProgress(50);
-                            break;
-                        case 'generation':
-                            setProgress(80);
-                            break;
-                        case 'completed':
-                            setProgress(100);
-                            break;
+                    // Calculate progress based on stage
+                    if (data.status === 'completed') {
+                        setProgress(100);
+                        toast.success('Processing completed successfully!');
+                        setTimeout(() => {
+                            router.push(`/course/${documentId}`);
+                        }, 1000);
+                    } else if (data.status === 'error') {
+                        toast.error(
+                            `Processing failed: ${data.message || 'Unknown error'}`,
+                        );
+                        setStatus((prev) => ({ ...prev, status: 'error' }));
+                    } else {
+                        // process_full_pipeline stages:
+                        // started -> extraction -> extraction_done -> chunking -> summarization -> generation_done
+                        const stage = data.stage;
+                        switch (stage) {
+                            case 'started':
+                                setProgress(10);
+                                break;
+                            case 'extraction':
+                                setProgress(25);
+                                break;
+                            case 'extraction_done':
+                                setProgress(40);
+                                break;
+                            case 'chunking':
+                                setProgress(55);
+                                break;
+                            case 'summarization':
+                                setProgress(80);
+                                break;
+                            case 'generation_done':
+                                setProgress(100);
+                                break;
+                            default:
+                                // Keep current progress if unknown stage, but ensure at least minimal visible progress
+                                if (progress < 10) setProgress(5);
+                        }
                     }
+                } else {
+                    console.log('Job document not found yet - waiting...');
                 }
-
-                if (data.status === 'completed') {
-                    setProgress(100);
-                    toast.success('Processing completed successfully!');
-                    setTimeout(() => {
-                        router.push(`/course/${documentId}`);
-                    }, 1500);
-                } else if (data.status === 'error') {
-                    toast.error(`Processing failed: ${data.message || data.error}`);
-                }
-            }
-        }, (error) => {
-            console.error('Firestore Error:', error);
-            setStatus({
-                status: 'error',
-                message: 'Connection error. Please try again.',
-            });
-        });
+            },
+            (error) => {
+                console.error('Firestore Error:', error);
+                // Don't show error immediately as it might be transient
+            },
+        );
 
         return () => unsubscribe();
     }, [documentId, router]);

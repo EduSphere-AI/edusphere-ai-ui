@@ -12,7 +12,7 @@ import {
 import { db } from './firebase';
 
 export interface FileMetadata {
-    userId: string;
+    // userId: string; // Removed
     fileName: string;
     originalFileName: string;
     fileSize: number;
@@ -39,7 +39,6 @@ export async function saveFileMetadata(
         console.log('✅ File metadata saved to Firestore:', {
             fileId: docRef.id,
             fileName: metadata.fileName,
-            userId: metadata.userId,
         });
 
         return {

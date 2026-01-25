@@ -5,8 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useAuthStore } from '@/store/auth.store';
-import { listUserFiles } from '@/lib/supabase';
+// import { useAuthStore } from '@/store/auth.store';
 import { API_BASE_URL } from '@/lib/constants';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -23,9 +22,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
-import mockPresentation from '@/output/generation/presentation.json';
-import mockExtractionResult from '@/output/extraction/extraction_result.json';
-import mockSummarizationResult from '@/output/summarization/summary_result.json';
+import {
+    StructuredJsonView,
+    StructuredChapter, // Import type
+    transformToStructuredData,
+} from '@/components/StructuredJsonView';
+import { StructuredMarkdownView } from '@/components/StructuredMarkdownView';
+import { updateDoc } from 'firebase/firestore'; // Import updateDoc
 
 // Types for our PDF document
 interface PDFDocument {
@@ -75,7 +78,7 @@ const formatText = (text: string) => {
 export default function PDFViewerPage() {
     const params = useParams();
     const router = useRouter();
-    const { user } = useAuthStore();
+    // const { user } = useAuthStore(); // Auth removed
     const docId = params.id as string;
 
     // FIXED: Renamed from 'document' to 'pdfDocument' to avoid shadowing global document object
@@ -86,139 +89,26 @@ export default function PDFViewerPage() {
     const [chapters, setChapters] = useState<Chapter[]>([]);
     const [extractionData, setExtractionData] = useState<any>(null);
     const [summarizationData, setSummarizationData] = useState<any>(null);
+    // Add state for structured slides if loaded from DB
+    const [structuredSlides, setStructuredSlides] = useState<
+        StructuredChapter[] | null
+    >(null);
+
     const [activeTab, setActiveTab] = useState('slides');
     const [selectedChapter, setSelectedChapter] = useState<number | 'all'>(
         'all',
     );
 
+    const [selectedPage, setSelectedPage] = useState<number | 'all'>('all'); // Add state for Extraction tab pagination
+
     // Fetch document details
     useEffect(() => {
         const fetchDocument = async () => {
-            if (!user) {
+            /*if (!user) {
                 toast.error('Please log in to view documents');
                 router.push('/dashboard');
                 return;
-            }
-
-            if (docId === 'doc-1') {
-                setSlides(mockPresentation.slides as any[]);
-                setChapters((mockPresentation.chapters as any[]) || []);
-
-                // Define extra images that are present in the folder but missing from JSON
-                const extraImages = [
-                    {
-                        page: 1,
-                        name: 'page_1_figure_1_graphs.png',
-                        type: 'Chart',
-                        caption: 'Graphs extracted from Figure 1',
-                    },
-                    {
-                        page: 1,
-                        name: 'page_1_figure_1_map.png',
-                        type: 'Map',
-                        caption: 'Map extracted from Figure 1',
-                    },
-                    {
-                        page: 6,
-                        name: 'page_6_figure_1_row1.png',
-                        type: 'Figure Row',
-                        caption: 'Row 1 of Figure 1',
-                    },
-                    {
-                        page: 6,
-                        name: 'page_6_figure_1_row2.png',
-                        type: 'Figure Row',
-                        caption: 'Row 2 of Figure 1',
-                    },
-                    {
-                        page: 6,
-                        name: 'page_6_figure_1_row3.png',
-                        type: 'Figure Row',
-                        caption: 'Row 3 of Figure 1',
-                    },
-                    {
-                        page: 7,
-                        name: 'page_7_figure_1_row1.png',
-                        type: 'Figure Row',
-                        caption: 'Row 1 of Figure 1',
-                    },
-                    {
-                        page: 7,
-                        name: 'page_7_figure_1_row2.png',
-                        type: 'Figure Row',
-                        caption: 'Row 2 of Figure 1',
-                    },
-                    {
-                        page: 7,
-                        name: 'page_7_figure_1_row3.png',
-                        type: 'Figure Row',
-                        caption: 'Row 3 of Figure 1',
-                    },
-                ];
-
-                // Process extraction data to fix image paths and inject missing images
-                const processedExtraction = {
-                    ...mockExtractionResult,
-                    pages: mockExtractionResult.pages.map((page: any) => {
-                        // Fix existing elements
-                        const existingElements = page.elements.map(
-                            (el: any) => {
-                                if (el.image_context?.image_path) {
-                                    const imagePath =
-                                        el.image_context.image_path;
-                                    const fixedUrl = imagePath.startsWith(
-                                        'images/',
-                                    )
-                                        ? `/output/${imagePath}`
-                                        : `/output/images/${imagePath}`;
-
-                                    return {
-                                        ...el,
-                                        image_url: fixedUrl, // Lift to top level for component
-                                        image_context: {
-                                            ...el.image_context,
-                                            image_url: fixedUrl,
-                                        },
-                                    };
-                                }
-                                return el;
-                            },
-                        );
-
-                        // Find and add extra images for this page
-                        const pageExtras = extraImages
-                            .filter((img) => img.page === page.page_number)
-                            .map((img) => ({
-                                type: 'figure',
-                                content: img.caption,
-                                metadata: { caption: img.caption },
-                                image_url: `/output/images/${img.name}`,
-                                image_context: {
-                                    image_url: `/output/images/${img.name}`,
-                                    title: img.type,
-                                },
-                            }));
-
-                        return {
-                            ...page,
-                            elements: [...existingElements, ...pageExtras],
-                        };
-                    }),
-                };
-
-                setExtractionData(processedExtraction);
-                setSummarizationData(mockSummarizationResult);
-
-                setPdfDocument({
-                    id: 'doc-1',
-                    title: 'Doc 1 Presentation',
-                    fileUrl: '',
-                    filePath: '',
-                    uploadDate: new Date().toISOString(),
-                });
-                setIsLoading(false);
-                return;
-            }
+            }*/
 
             try {
                 setIsLoading(true);
@@ -228,47 +118,131 @@ export default function PDFViewerPage() {
 
                 // 2. Fetch Results from Firestore
                 try {
-                    // Fetch Generation Results
-                    const genRef = doc(
-                        db,
-                        'documents',
-                        docId,
-                        'results',
-                        'generation',
-                    );
-                    const genSnap = await getDoc(genRef);
-                    if (genSnap.exists()) {
-                        const data = genSnap.data();
-                        setSlides(data.slides || []);
-                        setChapters(data.chapters || []);
-                    }
+                    // Try Fetching from Jobs collection (New Architecture)
+                    const jobRef = doc(db, 'jobs', `job_${docId}`);
+                    const jobSnap = await getDoc(jobRef);
 
-                    // Fetch Extraction Results
-                    const extRef = doc(
-                        db,
-                        'documents',
-                        docId,
-                        'results',
-                        'extraction',
-                    );
-                    const extSnap = await getDoc(extRef);
-                    if (extSnap.exists()) {
-                        setExtractionData(
-                            extSnap.data().content || extSnap.data().data || [],
+                    if (
+                        jobSnap.exists() &&
+                        jobSnap.data().status === 'completed'
+                    ) {
+                        const jobData = jobSnap.data();
+                        console.log('Using Job Data:', jobData);
+
+                        // 1. Slides & Chapters
+                        // Check for saved structured_slides (edited version) first
+                        if (jobData.result_json?.structured_slides) {
+                            setStructuredSlides(
+                                jobData.result_json.structured_slides,
+                            );
+                            // Set raw slides too for sidebar compatibility if needed, though sidebar uses 'slides' state
+                            setSlides(jobData.result_json.slides || []);
+                            setChapters(jobData.result_json.chapters || []);
+                        } else if (jobData.result_json) {
+                            setSlides(jobData.result_json.slides || []);
+                            setChapters(jobData.result_json.chapters || []);
+                        }
+
+                        // If slides missing in Job, try generation subcollection
+                        if (
+                            !jobData.result_json?.slides?.length &&
+                            !jobData.result_json?.structured_slides
+                        ) {
+                            const genRef = doc(
+                                db,
+                                'documents',
+                                docId,
+                                'results',
+                                'generation',
+                            );
+                            const genSnap = await getDoc(genRef);
+                            if (genSnap.exists()) {
+                                const data = genSnap.data();
+                                setSlides(data.slides || []);
+                                setChapters(data.chapters || []);
+                            }
+                        }
+
+                        // 2. Extraction Data
+                        // Usually too large for Job doc, fetch from subcollection
+                        if (jobData.extracted_content) {
+                            setExtractionData(jobData.extracted_content);
+                        } else {
+                            const extRef = doc(
+                                db,
+                                'documents',
+                                docId,
+                                'results',
+                                'extraction',
+                            );
+                            const extSnap = await getDoc(extRef);
+                            if (extSnap.exists()) {
+                                setExtractionData(
+                                    extSnap.data().content ||
+                                        extSnap.data().data ||
+                                        [],
+                                );
+                            }
+                        }
+
+                        // 3. Summarization Data
+                        // Fetch from subcollection
+                        const sumRef = doc(
+                            db,
+                            'documents',
+                            docId,
+                            'results',
+                            'summarization',
                         );
-                    }
+                        const sumSnap = await getDoc(sumRef);
+                        if (sumSnap.exists()) {
+                            setSummarizationData(sumSnap.data());
+                        }
+                    } else {
+                        // Fallback: Fetch Generation Results (Old Architecture)
+                        const genRef = doc(
+                            db,
+                            'documents',
+                            docId,
+                            'results',
+                            'generation',
+                        );
+                        const genSnap = await getDoc(genRef);
+                        if (genSnap.exists()) {
+                            const data = genSnap.data();
+                            setSlides(data.slides || []);
+                            setChapters(data.chapters || []);
+                        }
 
-                    // Fetch Summarization Results
-                    const sumRef = doc(
-                        db,
-                        'documents',
-                        docId,
-                        'results',
-                        'summarization',
-                    );
-                    const sumSnap = await getDoc(sumRef);
-                    if (sumSnap.exists()) {
-                        setSummarizationData(sumSnap.data());
+                        // Fetch Extraction Results
+                        const extRef = doc(
+                            db,
+                            'documents',
+                            docId,
+                            'results',
+                            'extraction',
+                        );
+                        const extSnap = await getDoc(extRef);
+                        if (extSnap.exists()) {
+                            setExtractionData(
+                                extSnap.data().content ||
+                                    extSnap.data().data ||
+                                    [],
+                            );
+                        }
+
+                        // Fetch Summarization Results
+                        const sumRef = doc(
+                            db,
+                            'documents',
+                            docId,
+                            'results',
+                            'summarization',
+                        );
+                        const sumSnap = await getDoc(sumRef);
+                        if (sumSnap.exists()) {
+                            setSummarizationData(sumSnap.data());
+                        }
                     }
                 } catch (error) {
                     console.error('Error fetching Firestore results:', error);
@@ -299,42 +273,12 @@ export default function PDFViewerPage() {
                         return;
                     }
                 } catch (serverError) {
-                    console.warn(
-                        'Failed to fetch from server, falling back to Supabase:',
-                        serverError,
-                    );
+                    console.warn('Failed to fetch from server:', serverError);
                 }
 
-                // Fallback to Supabase
-                const result = await listUserFiles(user.id);
-
-                if (result.success && result.files) {
-                    // Find the specific document by matching the ID or filename
-                    const foundDoc = result.files.find(
-                        (file) =>
-                            file.id === docId || file.name.includes(docId),
-                    );
-
-                    if (foundDoc) {
-                        const doc: PDFDocument = {
-                            id: foundDoc.id,
-                            title: foundDoc.name.replace(/^\d+-/, ''), // Remove timestamp prefix
-                            fileUrl: foundDoc.publicUrl,
-                            filePath: foundDoc.path,
-                            uploadDate: new Date(
-                                foundDoc.createdAt,
-                            ).toLocaleDateString(),
-                        };
-
-                        setPdfDocument(doc);
-                        setPdfUrl(foundDoc.publicUrl);
-                    } else {
-                        toast.error('Document not found');
-                        router.push('/dashboard');
-                    }
-                } else {
-                    throw new Error(result.error || 'Failed to load document');
-                }
+                // If we get here, we couldn't find the document
+                toast.error('Document not found');
+                router.push('/dashboard');
             } catch (error) {
                 console.error('Error fetching document:', error);
                 toast.error('Failed to load document');
@@ -345,7 +289,7 @@ export default function PDFViewerPage() {
         };
 
         fetchDocument();
-    }, [docId, user, router]);
+    }, [docId, router]);
 
     // Handle PDF download
     const handleDownload = async () => {
@@ -367,6 +311,48 @@ export default function PDFViewerPage() {
         } catch (error) {
             console.error('Download error:', error);
             toast.error('Failed to download PDF');
+        }
+    };
+
+    const handleSaveSlides = async (newData: StructuredChapter[]) => {
+        if (!docId) return;
+
+        try {
+            const jobRef = doc(db, 'jobs', `job_${docId}`);
+            // We assume we are updating the job document (new architecture)
+            // If the user is on old architecture, we might need logic to update 'documents/{id}/results/generation'
+            // For now, let's update both to be safe or prefer job.
+
+            // Fetch job to see if it exists
+            const jobSnap = await getDoc(jobRef);
+            if (jobSnap.exists()) {
+                await updateDoc(jobRef, {
+                    'result_json.structured_slides': newData,
+                    // We don't overwrite 'slides' because mapping back is lossy.
+                    // Instead, we rely on 'structured_slides' taking precedence in the UI.
+                });
+                toast.success('Slides saved successfully');
+                setStructuredSlides(newData);
+            } else {
+                // Fallback to old document structure?
+                // Actually if job doesn't exist, we probably shouldn't be here in this specific flow.
+                // But let's try updating generation subcollection just in case.
+                const genRef = doc(
+                    db,
+                    'documents',
+                    docId,
+                    'results',
+                    'generation',
+                );
+                await updateDoc(genRef, {
+                    structured_slides: newData,
+                });
+                toast.success('Slides saved successfully (Legacy)');
+                setStructuredSlides(newData);
+            }
+        } catch (error) {
+            console.error('Error saving slides:', error);
+            toast.error('Failed to save changes');
         }
     };
 
@@ -414,6 +400,19 @@ export default function PDFViewerPage() {
             <div className="space-y-6">
                 <div className="flex space-x-2 border-b">
                     <button
+                        onClick={() => setActiveTab('overview')}
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                            activeTab === 'overview'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <Eye className="h-4 w-4" />
+                            Overview
+                        </div>
+                    </button>
+                    <button
                         onClick={() => setActiveTab('slides')}
                         className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                             activeTab === 'slides'
@@ -423,7 +422,7 @@ export default function PDFViewerPage() {
                     >
                         <div className="flex items-center gap-2">
                             <Presentation className="h-4 w-4" />
-                            Generated Slides
+                            Slides
                         </div>
                     </button>
                     <button
@@ -481,7 +480,7 @@ export default function PDFViewerPage() {
                 </div>
 
                 {/* Tab Content */}
-                {activeTab === 'slides' && (
+                {activeTab === 'overview' && (
                     <div className="flex flex-col lg:flex-row gap-6 items-start">
                         {/* Sidebar */}
                         <div className="w-full lg:w-64 shrink-0 lg:sticky lg:top-4 space-y-2 max-h-[calc(100vh-100px)] overflow-y-auto">
@@ -551,115 +550,211 @@ export default function PDFViewerPage() {
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="prose dark:prose-invert max-w-none space-y-4">
-                                                    {slide.content.map(
-                                                        (item, idx) => {
-                                                            const type = (
-                                                                item.type ||
-                                                                'text'
-                                                            ).toLowerCase();
-                                                            return (
-                                                                <div key={idx}>
-                                                                    {(type ===
-                                                                        'title' ||
-                                                                        type ===
-                                                                            'section_title') && (
-                                                                        <h3 className="text-xl font-bold">
-                                                                            {formatText(
-                                                                                item.text,
-                                                                            )}
-                                                                        </h3>
-                                                                    )}
-                                                                    {(type ===
-                                                                        'text' ||
-                                                                        type ===
-                                                                            'paragraph') && (
-                                                                        <div className="prose dark:prose-invert max-w-none text-base leading-relaxed">
-                                                                            <ReactMarkdown>
-                                                                                {
-                                                                                    item.text
-                                                                                }
-                                                                            </ReactMarkdown>
-                                                                        </div>
-                                                                    )}
-                                                                    {(type ===
-                                                                        'bullet points' ||
-                                                                        type ===
-                                                                            'bullet') && (
-                                                                        <ul className="list-disc pl-5">
-                                                                            {item.text
-                                                                                .split(
-                                                                                    '\n',
-                                                                                )
-                                                                                .map(
-                                                                                    (
-                                                                                        line: string,
-                                                                                        i: number,
-                                                                                    ) => (
-                                                                                        <li
-                                                                                            key={
-                                                                                                i
-                                                                                            }
-                                                                                        >
-                                                                                            {formatText(
-                                                                                                line.replace(
-                                                                                                    /^[•-]\s*/,
-                                                                                                    '',
-                                                                                                ),
-                                                                                            )}
-                                                                                        </li>
-                                                                                    ),
+                                                    {Array.isArray(
+                                                        slide.content,
+                                                    ) &&
+                                                        slide.content.map(
+                                                            (item, idx) => {
+                                                                const type = (
+                                                                    item.type ||
+                                                                    'text'
+                                                                ).toLowerCase();
+                                                                return (
+                                                                    <div
+                                                                        key={
+                                                                            idx
+                                                                        }
+                                                                    >
+                                                                        {(type ===
+                                                                            'title' ||
+                                                                            type ===
+                                                                                'section_title') && (
+                                                                            <h3 className="text-xl font-bold">
+                                                                                {formatText(
+                                                                                    item.text,
                                                                                 )}
-                                                                        </ul>
-                                                                    )}
-                                                                    {(type ===
-                                                                        'code' ||
-                                                                        type ===
-                                                                            'table') && (
-                                                                        <pre className="bg-muted p-4 rounded-md overflow-x-auto whitespace-pre-wrap">
-                                                                            <code>
-                                                                                {
-                                                                                    item.text
-                                                                                }
-                                                                            </code>
-                                                                        </pre>
-                                                                    )}
-                                                                    {(type ===
-                                                                        'image' ||
-                                                                        type ===
-                                                                            'figure') && (
-                                                                        <div className="my-4">
-                                                                            {item
-                                                                                .metadata
-                                                                                ?.image_url ? (
-                                                                                <img
-                                                                                    src={
-                                                                                        item
-                                                                                            .metadata
-                                                                                            .image_url
-                                                                                    }
-                                                                                    alt={
-                                                                                        item.text ||
-                                                                                        'Slide Image'
-                                                                                    }
-                                                                                    className="max-w-full h-auto rounded-lg"
-                                                                                />
-                                                                            ) : (
-                                                                                <p className="text-sm text-muted-foreground mb-2 p-4 border border-dashed rounded-lg text-center">
-                                                                                    [Image
-                                                                                    Placeholder:{' '}
+                                                                            </h3>
+                                                                        )}
+                                                                        {(type ===
+                                                                            'text' ||
+                                                                            type ===
+                                                                                'paragraph') && (
+                                                                            <div className="prose dark:prose-invert max-w-none text-base leading-relaxed">
+                                                                                <ReactMarkdown>
                                                                                     {
                                                                                         item.text
                                                                                     }
+                                                                                </ReactMarkdown>
+                                                                            </div>
+                                                                        )}
+                                                                        {(type ===
+                                                                            'bullet points' ||
+                                                                            type ===
+                                                                                'bullet') && (
+                                                                            <ul className="list-disc pl-5">
+                                                                                {item.text
+                                                                                    .split(
+                                                                                        '\n',
+                                                                                    )
+                                                                                    .map(
+                                                                                        (
+                                                                                            line: string,
+                                                                                            i: number,
+                                                                                        ) => (
+                                                                                            <li
+                                                                                                key={
+                                                                                                    i
+                                                                                                }
+                                                                                            >
+                                                                                                {formatText(
+                                                                                                    line.replace(
+                                                                                                        /^[•-]\s*/,
+                                                                                                        '',
+                                                                                                    ),
+                                                                                                )}
+                                                                                            </li>
+                                                                                        ),
+                                                                                    )}
+                                                                            </ul>
+                                                                        )}
+                                                                        {(type ===
+                                                                            'code' ||
+                                                                            type ===
+                                                                                'table') && (
+                                                                            <div className="my-4">
+                                                                                {item
+                                                                                    .metadata
+                                                                                    ?.table_data ? (
+                                                                                    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                                                                                        {item
+                                                                                            .metadata
+                                                                                            .caption && (
+                                                                                            <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 italic">
+                                                                                                {
+                                                                                                    item
+                                                                                                        .metadata
+                                                                                                        .caption
+                                                                                                }
+                                                                                            </div>
+                                                                                        )}
+                                                                                        <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300">
+                                                                                            {item
+                                                                                                .metadata
+                                                                                                .table_headers && (
+                                                                                                <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-100 dark:bg-gray-800">
+                                                                                                    <tr>
+                                                                                                        {item.metadata.table_headers.map(
+                                                                                                            (
+                                                                                                                h: string,
+                                                                                                                i: number,
+                                                                                                            ) => (
+                                                                                                                <th
+                                                                                                                    key={
+                                                                                                                        i
+                                                                                                                    }
+                                                                                                                    className="px-6 py-3 font-semibold border-b border-gray-200 dark:border-gray-700"
+                                                                                                                >
+                                                                                                                    {
+                                                                                                                        h
+                                                                                                                    }
+                                                                                                                </th>
+                                                                                                            ),
+                                                                                                        )}
+                                                                                                    </tr>
+                                                                                                </thead>
+                                                                                            )}
+                                                                                            <tbody>
+                                                                                                {item.metadata.table_data.map(
+                                                                                                    (
+                                                                                                        row: any,
+                                                                                                        i: number,
+                                                                                                    ) => {
+                                                                                                        // Handle row format which is { row: [...] }
+                                                                                                        const cells = Array.isArray(
+                                                                                                            row,
+                                                                                                        )
+                                                                                                            ? row
+                                                                                                            : row.row ||
+                                                                                                              [];
+                                                                                                        return (
+                                                                                                            <tr
+                                                                                                                key={
+                                                                                                                    i
+                                                                                                                }
+                                                                                                                className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                                                                                                            >
+                                                                                                                {cells.map(
+                                                                                                                    (
+                                                                                                                        cell: string,
+                                                                                                                        j: number,
+                                                                                                                    ) => (
+                                                                                                                        <td
+                                                                                                                            key={
+                                                                                                                                j
+                                                                                                                            }
+                                                                                                                            className="px-6 py-4"
+                                                                                                                        >
+                                                                                                                            {
+                                                                                                                                cell
+                                                                                                                            }
+                                                                                                                        </td>
+                                                                                                                    ),
+                                                                                                                )}
+                                                                                                            </tr>
+                                                                                                        );
+                                                                                                    },
+                                                                                                )}
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <pre className="bg-muted p-4 rounded-md overflow-x-auto whitespace-pre-wrap">
+                                                                                        <code>
+                                                                                            {
+                                                                                                item.text
+                                                                                            }
+                                                                                        </code>
+                                                                                    </pre>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                        {(type ===
+                                                                            'image' ||
+                                                                            type ===
+                                                                                'figure') && (
+                                                                            <div className="my-4">
+                                                                                {item
+                                                                                    .metadata
+                                                                                    ?.image_url ? (
+                                                                                    <img
+                                                                                        src={
+                                                                                            item
+                                                                                                .metadata
+                                                                                                .image_url
+                                                                                        }
+                                                                                        alt={
+                                                                                            item.text ||
+                                                                                            'Slide Image'
+                                                                                        }
+                                                                                        className="max-w-full h-auto rounded-lg"
+                                                                                    />
+                                                                                ) : (
+                                                                                    <p className="text-sm text-muted-foreground mb-2 p-4 border border-dashed rounded-lg text-center">
+                                                                                        [Image
+                                                                                        Placeholder:{' '}
+                                                                                        {
+                                                                                            item.text
+                                                                                        }
 
-                                                                                    ]
-                                                                                </p>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        },
-                                                    )}
+                                                                                        ]
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            },
+                                                        )}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -670,6 +765,22 @@ export default function PDFViewerPage() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'slides' && (
+                    <div className="bg-gray-50 dark:bg-gray-900/50 min-h-[500px] p-6 rounded-lg">
+                        <StructuredJsonView
+                            data={
+                                structuredSlides ||
+                                transformToStructuredData(
+                                    slides || [],
+                                    chapters || [],
+                                )
+                            }
+                            onSave={handleSaveSlides}
+                            canEdit={true}
+                        />
                     </div>
                 )}
 
@@ -753,20 +864,11 @@ export default function PDFViewerPage() {
                         {summarizationData ? (
                             <>
                                 {summarizationData.global_summary && (
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle>
-                                                Global Summary
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <p className="whitespace-pre-wrap">
-                                                {
-                                                    summarizationData.global_summary
-                                                }
-                                            </p>
-                                        </CardContent>
-                                    </Card>
+                                    <StructuredMarkdownView
+                                        markdown={
+                                            summarizationData.global_summary
+                                        }
+                                    />
                                 )}
                                 <div className="grid gap-6">
                                     {(
@@ -908,224 +1010,364 @@ export default function PDFViewerPage() {
                 )}
 
                 {activeTab === 'extraction' && (
-                    <div className="space-y-8">
+                    <div className="flex flex-col lg:flex-row gap-6 items-start">
                         {(() => {
-                            let data: any[] = [];
+                            let pages: {
+                                page_number: number;
+                                elements: any[];
+                            }[] = [];
+
                             if (extractionData) {
-                                if (Array.isArray(extractionData)) {
-                                    data = extractionData;
-                                } else if (extractionData.pages) {
-                                    // Flatten elements from all pages
-                                    data = extractionData.pages.flatMap(
-                                        (page: any) =>
-                                            page.elements
-                                                ? page.elements.map(
-                                                      (el: any) => ({
-                                                          ...el,
-                                                          page_number:
-                                                              page.page_number,
-                                                      }),
-                                                  )
-                                                : [],
-                                    );
-                                } else if (extractionData.content) {
-                                    data = extractionData.content;
+                                if (
+                                    extractionData.pages &&
+                                    Array.isArray(extractionData.pages)
+                                ) {
+                                    pages = extractionData.pages;
+                                } else if (Array.isArray(extractionData)) {
+                                    // Group by page
+                                    const distinctPages = Array.from(
+                                        new Set(
+                                            extractionData.map(
+                                                (i: any) => i.page_number,
+                                            ),
+                                        ),
+                                    ).sort() as number[];
+                                    pages = distinctPages.map((pNum) => ({
+                                        page_number: pNum,
+                                        elements: extractionData.filter(
+                                            (i: any) => i.page_number === pNum,
+                                        ),
+                                    }));
+                                } else if (
+                                    extractionData.content &&
+                                    Array.isArray(extractionData.content)
+                                ) {
+                                    // Similar grouping
+                                    const content = extractionData.content;
+                                    const distinctPages = Array.from(
+                                        new Set(
+                                            content.map(
+                                                (i: any) => i.page_number,
+                                            ),
+                                        ),
+                                    ).sort() as number[];
+                                    pages = distinctPages.map((pNum) => ({
+                                        page_number: pNum,
+                                        elements: content.filter(
+                                            (i: any) => i.page_number === pNum,
+                                        ),
+                                    }));
                                 }
                             }
 
-                            if (data.length === 0) {
+                            if (pages.length === 0) {
                                 return (
-                                    <div className="text-center py-12 text-muted-foreground">
+                                    <div className="w-full text-center py-12 text-muted-foreground">
                                         No extraction data found.
                                     </div>
                                 );
                             }
 
-                            // Separate images and other content
-                            const images = data.filter(
-                                (item) =>
-                                    (['Image', 'figure', 'chart'].includes(
-                                        item.type,
-                                    ) &&
-                                        item.image_url) ||
-                                    (item.image_context &&
-                                        item.image_context.image_url),
-                            );
-
-                            const otherContent = data.filter(
-                                (item) => !images.includes(item),
-                            );
-
                             return (
                                 <>
-                                    {/* Images Gallery */}
-                                    {images.length > 0 && (
-                                        <div>
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-xl font-bold flex items-center gap-2">
-                                                    <ImageIcon className="h-5 w-5" />
-                                                    Extracted Visuals
-                                                </h3>
-                                                <Badge variant="secondary">
-                                                    {images.length} Images
-                                                </Badge>
-                                            </div>
-                                            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-                                                {images.map(
-                                                    (
-                                                        item: any,
-                                                        index: number,
-                                                    ) => {
-                                                        const imageUrl =
-                                                            item.image_url ||
-                                                            item.image_context
-                                                                ?.image_url;
-                                                        return (
-                                                            <div
-                                                                key={index}
-                                                                className="break-inside-avoid"
-                                                            >
-                                                                <Card className="overflow-hidden">
-                                                                    <div className="relative bg-muted/20">
-                                                                        <img
-                                                                            src={
-                                                                                imageUrl
-                                                                            }
-                                                                            alt={
-                                                                                item.type ||
-                                                                                'Extracted Visual'
-                                                                            }
-                                                                            className="w-full h-auto object-cover transition-all hover:scale-105"
-                                                                            loading="lazy"
-                                                                        />
-                                                                    </div>
-                                                                    <CardContent className="p-4">
-                                                                        <div className="flex items-center justify-between mb-2">
-                                                                            <Badge
-                                                                                variant="outline"
-                                                                                className="capitalize"
-                                                                            >
-                                                                                {
-                                                                                    item.type
-                                                                                }
-                                                                            </Badge>
-                                                                            {item.page_number && (
-                                                                                <span className="text-xs text-muted-foreground">
-                                                                                    Page{' '}
-                                                                                    {
-                                                                                        item.page_number
-                                                                                    }
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                        {item
-                                                                            .metadata
-                                                                            ?.caption && (
-                                                                            <p className="text-sm text-muted-foreground italic">
-                                                                                {
-                                                                                    item
-                                                                                        .metadata
-                                                                                        .caption
-                                                                                }
-                                                                            </p>
-                                                                        )}
-                                                                        {item.content &&
-                                                                            item.content !==
-                                                                                'Figure on page ' +
-                                                                                    item.page_number && (
-                                                                                <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                                                                                    {
-                                                                                        item.content
-                                                                                    }
-                                                                                </p>
-                                                                            )}
-                                                                    </CardContent>
-                                                                </Card>
-                                                            </div>
-                                                        );
-                                                    },
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Other Content */}
-                                    {otherContent.length > 0 && (
-                                        <div
-                                            className={
-                                                images.length > 0 ? 'mt-12' : ''
+                                    {/* Sidebar */}
+                                    <div className="w-full lg:w-64 shrink-0 lg:sticky lg:top-4 space-y-2 max-h-[calc(100vh-100px)] overflow-y-auto">
+                                        <Button
+                                            variant={
+                                                selectedPage === 'all'
+                                                    ? 'secondary'
+                                                    : 'ghost'
+                                            }
+                                            className="w-full justify-start"
+                                            onClick={() =>
+                                                setSelectedPage('all')
                                             }
                                         >
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-xl font-bold flex items-center gap-2">
-                                                    <FileText className="h-5 w-5" />
-                                                    Extracted Content
-                                                </h3>
-                                                <Badge variant="secondary">
-                                                    {otherContent.length} Items
-                                                </Badge>
+                                            <div className="flex items-center gap-2">
+                                                <FileType className="h-4 w-4" />
+                                                All Pages
                                             </div>
-                                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                                {otherContent.map(
-                                                    (
-                                                        item: any,
-                                                        index: number,
-                                                    ) => (
-                                                        <Card
-                                                            key={index}
-                                                            className="h-full"
-                                                        >
-                                                            <CardContent className="p-4 flex flex-col h-full">
-                                                                <div className="flex justify-between items-start mb-3">
-                                                                    <Badge
-                                                                        variant="secondary"
-                                                                        className="capitalize"
-                                                                    >
-                                                                        {item.type ||
-                                                                            'Content'}
-                                                                    </Badge>
-                                                                    {item.page_number && (
-                                                                        <span className="text-xs text-muted-foreground">
-                                                                            Page{' '}
-                                                                            {
-                                                                                item.page_number
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                </div>
+                                        </Button>
+                                        {pages.map((page) => (
+                                            <Button
+                                                key={page.page_number}
+                                                variant={
+                                                    selectedPage ===
+                                                    page.page_number
+                                                        ? 'secondary'
+                                                        : 'ghost'
+                                                }
+                                                className="w-full justify-start text-left"
+                                                onClick={() =>
+                                                    setSelectedPage(
+                                                        page.page_number,
+                                                    )
+                                                }
+                                            >
+                                                Page {page.page_number}
+                                            </Button>
+                                        ))}
+                                    </div>
 
-                                                                {/* Handle Tables */}
-                                                                {item.type ===
-                                                                'table' ? (
-                                                                    <div className="bg-muted p-2 rounded text-xs font-mono overflow-auto max-h-60">
-                                                                        <pre>
-                                                                            {typeof item.content ===
-                                                                            'string'
-                                                                                ? item.content
-                                                                                : JSON.stringify(
-                                                                                      item.table_data ||
-                                                                                          item.content,
-                                                                                      null,
-                                                                                      2,
-                                                                                  )}
-                                                                        </pre>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="text-sm whitespace-pre-wrap line-clamp-[10] overflow-y-auto max-h-60">
-                                                                        {item.content ||
-                                                                            item.text ||
-                                                                            JSON.stringify(
-                                                                                item,
-                                                                            )}
-                                                                    </div>
-                                                                )}
-                                                            </CardContent>
-                                                        </Card>
-                                                    ),
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
+                                    {/* Main Content */}
+                                    <div className="flex-1 min-w-0 space-y-8">
+                                        {pages
+                                            .filter(
+                                                (p) =>
+                                                    selectedPage === 'all' ||
+                                                    p.page_number ===
+                                                        selectedPage,
+                                            )
+                                            .map((page) => (
+                                                <Card
+                                                    key={page.page_number}
+                                                    className="overflow-hidden shadow-sm"
+                                                >
+                                                    <CardHeader className="bg-muted/30 border-b py-3">
+                                                        <CardTitle className="text-base font-medium flex items-center justify-between">
+                                                            <span>
+                                                                Page{' '}
+                                                                {
+                                                                    page.page_number
+                                                                }
+                                                            </span>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="font-normal text-xs"
+                                                            >
+                                                                {page.elements
+                                                                    ?.length ||
+                                                                    0}{' '}
+                                                                Elements
+                                                            </Badge>
+                                                        </CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="p-6 sm:p-10 font-serif">
+                                                        <div className="space-y-4 max-w-3xl mx-auto">
+                                                            {(
+                                                                page.elements ||
+                                                                []
+                                                            ).map(
+                                                                (
+                                                                    item: any,
+                                                                    idx: number,
+                                                                ) => {
+                                                                    const type =
+                                                                        (
+                                                                            item.type ||
+                                                                            'text'
+                                                                        ).toLowerCase();
+
+                                                                    // Resolve Image URL - Check all possible locations
+                                                                    const imageUrl =
+                                                                        item.image_url ||
+                                                                        item
+                                                                            .metadata
+                                                                            ?.image_url ||
+                                                                        item
+                                                                            .image_context
+                                                                            ?.image_url;
+
+                                                                    const isImage =
+                                                                        [
+                                                                            'image',
+                                                                            'figure',
+                                                                            'chart',
+                                                                        ].includes(
+                                                                            type,
+                                                                        ) ||
+                                                                        !!imageUrl;
+
+                                                                    if (
+                                                                        isImage
+                                                                    ) {
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    idx
+                                                                                }
+                                                                                className="my-8"
+                                                                            >
+                                                                                {imageUrl ? (
+                                                                                    <div className="rounded-lg overflow-hidden border bg-muted/10">
+                                                                                        <img
+                                                                                            src={
+                                                                                                imageUrl
+                                                                                            }
+                                                                                            alt={
+                                                                                                item.text ||
+                                                                                                'Extracted Visual'
+                                                                                            }
+                                                                                            className="max-w-full h-auto mx-auto object-contain max-h-[600px]"
+                                                                                            loading="lazy"
+                                                                                        />
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="h-40 flex flex-col items-center justify-center bg-muted/20 border-2 border-dashed rounded-lg text-muted-foreground p-4">
+                                                                                        <ImageIcon className="h-8 w-8 mb-2 opacity-50" />
+                                                                                        <span className="text-sm font-medium">
+                                                                                            Image
+                                                                                            marker
+                                                                                        </span>
+                                                                                        <span className="text-xs max-w-md text-center mt-1">
+                                                                                            {item.content ||
+                                                                                                item.text ||
+                                                                                                'No visual data available'}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {(item
+                                                                                    .metadata
+                                                                                    ?.caption ||
+                                                                                    (type ===
+                                                                                        'figure' &&
+                                                                                        item.text)) && (
+                                                                                    <p className="mt-3 text-center text-sm text-muted-foreground italic">
+                                                                                        {item
+                                                                                            .metadata
+                                                                                            ?.caption ||
+                                                                                            item.text}
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Formatting based on type
+                                                                    // Skip 'header' and 'footer' if they are noisy, or style them differently
+                                                                    if (
+                                                                        [
+                                                                            'header',
+                                                                            'footer',
+                                                                        ].includes(
+                                                                            type,
+                                                                        )
+                                                                    ) {
+                                                                        return (
+                                                                            <p
+                                                                                key={
+                                                                                    idx
+                                                                                }
+                                                                                className="text-xs text-muted-foreground uppercase tracking-widest text-center py-2 opacity-60"
+                                                                            >
+                                                                                {item.text ||
+                                                                                    item.content}
+                                                                            </p>
+                                                                        );
+                                                                    }
+
+                                                                    if (
+                                                                        [
+                                                                            'title',
+                                                                            'h1',
+                                                                        ].includes(
+                                                                            type,
+                                                                        )
+                                                                    ) {
+                                                                        return (
+                                                                            <h2
+                                                                                key={
+                                                                                    idx
+                                                                                }
+                                                                                className="text-3xl font-bold mb-6 mt-8 first:mt-0 text-foreground text-center"
+                                                                            >
+                                                                                {item.text ||
+                                                                                    item.content}
+                                                                            </h2>
+                                                                        );
+                                                                    }
+                                                                    if (
+                                                                        [
+                                                                            'h2',
+                                                                            'section_title',
+                                                                            'subtitle',
+                                                                        ].includes(
+                                                                            type,
+                                                                        )
+                                                                    ) {
+                                                                        return (
+                                                                            <h3
+                                                                                key={
+                                                                                    idx
+                                                                                }
+                                                                                className="text-xl font-semibold mb-3 mt-6 text-foreground"
+                                                                            >
+                                                                                {item.text ||
+                                                                                    item.content}
+                                                                            </h3>
+                                                                        );
+                                                                    }
+                                                                    if (
+                                                                        [
+                                                                            'table',
+                                                                        ].includes(
+                                                                            type,
+                                                                        )
+                                                                    ) {
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    idx
+                                                                                }
+                                                                                className="my-4 overflow-x-auto border rounded-md"
+                                                                            >
+                                                                                <pre className="text-xs p-4 bg-muted/30 font-mono">
+                                                                                    {typeof item.content ===
+                                                                                    'object'
+                                                                                        ? JSON.stringify(
+                                                                                              item.content,
+                                                                                              null,
+                                                                                              2,
+                                                                                          )
+                                                                                        : item.content}
+                                                                                </pre>
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    if (
+                                                                        [
+                                                                            'bullet_point',
+                                                                            'list_item',
+                                                                            'bullet',
+                                                                        ].includes(
+                                                                            type,
+                                                                        )
+                                                                    ) {
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    idx
+                                                                                }
+                                                                                className="flex gap-3 mb-2 ml-2"
+                                                                            >
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-foreground/70 shrink-0 mt-2.5"></div>
+                                                                                <p className="leading-relaxed text-foreground/90 font-sans">
+                                                                                    {item.text ||
+                                                                                        item.content}
+                                                                                </p>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Default Paragraph
+                                                                    return (
+                                                                        <p
+                                                                            key={
+                                                                                idx
+                                                                            }
+                                                                            className="leading-relaxed text-foreground/90 mb-4 whitespace-pre-wrap font-sans text-lg"
+                                                                        >
+                                                                            {item.text ||
+                                                                                item.content}
+                                                                        </p>
+                                                                    );
+                                                                },
+                                                            )}
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            ))}
+                                    </div>
                                 </>
                             );
                         })()}
