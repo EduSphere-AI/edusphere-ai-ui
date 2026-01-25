@@ -66,7 +66,6 @@ export default function Home() {
                             </div>
 
                             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 text-gray-900 dark:text-gray-100">
-                                {t.rich('title', {
                                 Turn Research into{' '}
                                 <span className="gradient-text">
                                     Ready-to-Teach Slides
@@ -79,6 +78,7 @@ export default function Home() {
                                 PDFs into structured, beautiful teaching
                                 materials. Save time, maintain quality, and
                                 focus on what matters — inspiring your students.
+                            </p>
 
                             <div className="flex flex-col sm:flex-row gap-4 mb-8 max-w-md mx-auto lg:mx-0">
                                 <Link href="/register" className="flex-1">
