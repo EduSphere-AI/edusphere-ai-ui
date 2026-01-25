@@ -1,6 +1,13 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useCallback, useState, useRef } from 'react';
+import { useFileUpload } from '@/hooks/useFileUpload';
+import { processDocument } from '@/lib/api';
+import { toast } from 'sonner';
 import {
     BrainIcon,
     ChartNoAxesCombinedIcon,
@@ -11,9 +18,70 @@ import {
     TableIcon,
     UploadIcon,
     ZapIcon,
+    Loader2,
 } from 'lucide-react';
 
 export default function Home() {
+    const router = useRouter();
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const { upload, isUploading, progress, error } = useFileUpload({
+        onSuccess: async (data) => {
+            if (!data) return;
+            try {
+                toast.info('Starting document processing...');
+                // Trigger backend processing
+                await processDocument(data.publicUrl, data.fileId);
+                toast.success('File uploaded successfully!');
+                router.push(`/processing/${data.fileId}`);
+            } catch (err) {
+                console.error('Processing start failed:', err);
+                toast.error('Failed to start processing. Please try again.');
+            }
+        },
+        onError: (err) => {
+            toast.error(err);
+        },
+    });
+
+    const onDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    }, []);
+
+    const onDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    }, []);
+
+    const onDrop = useCallback(
+        (e: React.DragEvent) => {
+            e.preventDefault();
+            setIsDragging(false);
+
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                upload(file);
+            }
+        },
+        [upload],
+    );
+
+    const onFileSelect = useCallback(
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            if (e.target.files && e.target.files.length > 0) {
+                const file = e.target.files[0];
+                upload(file);
+            }
+        },
+        [upload],
+    );
+
+    const triggerFileSelect = () => {
+        fileInputRef.current?.click();
+    };
+
     const sectionOneBenefits = [
         'Save hours of manual slide preparation',
         'Maintain academic rigor and accuracy',
@@ -124,23 +192,60 @@ export default function Home() {
                         <div className="flex-1 w-full max-w-lg lg:max-w-none mt-8 lg:mt-0">
                             <div className="relative w-full p-6 sm:p-8 rounded-2xl bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 shadow-2xl">
                                 {/* Inner Upload Card */}
-                                <div className="w-full border-2 border-dashed border-blue-600 rounded-xl h-48 sm:h-56 lg:h-64 flex flex-col justify-center items-center bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors relative overflow-hidden group">
+                                <div
+                                    onDragOver={onDragOver}
+                                    onDragLeave={onDragLeave}
+                                    onDrop={onDrop}
+                                    onClick={triggerFileSelect}
+                                    className={`w-full border-2 border-dashed rounded-xl h-48 sm:h-56 lg:h-64 flex flex-col justify-center items-center transition-all relative overflow-hidden group cursor-pointer
+                                        ${
+                                            isDragging
+                                                ? 'border-blue-500 bg-blue-100 dark:bg-blue-900/30 scale-105'
+                                                : 'border-blue-600 bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20'
+                                        }
+                                    `}
+                                >
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={onFileSelect}
+                                        className="hidden"
+                                        accept=".pdf"
+                                    />
                                     <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 to-cyan-500/5 pointer-events-none"></div>
 
-                                    <div className="relative z-10 flex flex-col items-center">
-                                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg animate-bounce-slow mb-4">
-                                            <UploadIcon
-                                                size={28}
-                                                className="text-white"
+                                    {isUploading ? (
+                                        <div className="relative z-10 flex flex-col items-center w-full px-8">
+                                            <Loader2
+                                                size={48}
+                                                className="text-blue-600 animate-spin mb-4"
+                                            />
+                                            <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+                                                Uploading...
+                                            </p>
+                                            <Progress
+                                                value={progress}
+                                                className="w-full h-2"
                                             />
                                         </div>
-                                        <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
-                                            Drop your PDF here
-                                        </p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-medium">
-                                            or click to upload
-                                        </p>
-                                    </div>
+                                    ) : (
+                                        <div className="relative z-10 flex flex-col items-center">
+                                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg animate-bounce-slow mb-4">
+                                                <UploadIcon
+                                                    size={28}
+                                                    className="text-white"
+                                                />
+                                            </div>
+                                            <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
+                                                {isDragging
+                                                    ? 'Drop to upload!'
+                                                    : 'Drop your PDF here'}
+                                            </p>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-medium">
+                                                or click to upload
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Progress Stages */}

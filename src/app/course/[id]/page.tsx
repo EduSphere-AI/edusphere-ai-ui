@@ -559,6 +559,31 @@ export default function PDFViewerPage() {
                                                                     item.type ||
                                                                     'text'
                                                                 ).toLowerCase();
+
+                                                                // Safeguard: Extract text content safely
+                                                                let safeText =
+                                                                    item.text ||
+                                                                    item.content ||
+                                                                    '';
+                                                                if (
+                                                                    typeof safeText ===
+                                                                        'object' &&
+                                                                    safeText !==
+                                                                        null
+                                                                ) {
+                                                                    safeText =
+                                                                        safeText.text ||
+                                                                        safeText.content ||
+                                                                        JSON.stringify(
+                                                                            safeText,
+                                                                        );
+                                                                }
+                                                                // Ensure it's a string
+                                                                safeText =
+                                                                    String(
+                                                                        safeText,
+                                                                    );
+
                                                                 return (
                                                                     <div
                                                                         key={
@@ -571,7 +596,7 @@ export default function PDFViewerPage() {
                                                                                 'section_title') && (
                                                                             <h3 className="text-xl font-bold">
                                                                                 {formatText(
-                                                                                    item.text,
+                                                                                    safeText,
                                                                                 )}
                                                                             </h3>
                                                                         )}
@@ -582,7 +607,7 @@ export default function PDFViewerPage() {
                                                                             <div className="prose dark:prose-invert max-w-none text-base leading-relaxed">
                                                                                 <ReactMarkdown>
                                                                                     {
-                                                                                        item.text
+                                                                                        safeText
                                                                                     }
                                                                                 </ReactMarkdown>
                                                                             </div>
@@ -592,29 +617,52 @@ export default function PDFViewerPage() {
                                                                             type ===
                                                                                 'bullet') && (
                                                                             <ul className="list-disc pl-5">
-                                                                                {item.text
-                                                                                    .split(
-                                                                                        '\n',
-                                                                                    )
-                                                                                    .map(
-                                                                                        (
-                                                                                            line: string,
-                                                                                            i: number,
-                                                                                        ) => (
+                                                                                {(Array.isArray(
+                                                                                    item.text,
+                                                                                )
+                                                                                    ? item.text
+                                                                                    : safeText.split(
+                                                                                          '\n',
+                                                                                      )
+                                                                                ).map(
+                                                                                    (
+                                                                                        line: any,
+                                                                                        i: number,
+                                                                                    ) => {
+                                                                                        // Handle line if it's an object
+                                                                                        let lineText =
+                                                                                            line;
+                                                                                        if (
+                                                                                            typeof line ===
+                                                                                                'object' &&
+                                                                                            line !==
+                                                                                                null
+                                                                                        ) {
+                                                                                            lineText =
+                                                                                                line.text ||
+                                                                                                line.content ||
+                                                                                                JSON.stringify(
+                                                                                                    line,
+                                                                                                );
+                                                                                        }
+                                                                                        return (
                                                                                             <li
                                                                                                 key={
                                                                                                     i
                                                                                                 }
                                                                                             >
                                                                                                 {formatText(
-                                                                                                    line.replace(
+                                                                                                    String(
+                                                                                                        lineText,
+                                                                                                    ).replace(
                                                                                                         /^[•-]\s*/,
                                                                                                         '',
                                                                                                     ),
                                                                                                 )}
                                                                                             </li>
-                                                                                        ),
-                                                                                    )}
+                                                                                        );
+                                                                                    },
+                                                                                )}
                                                                             </ul>
                                                                         )}
                                                                         {(type ===
@@ -645,20 +693,35 @@ export default function PDFViewerPage() {
                                                                                                     <tr>
                                                                                                         {item.metadata.table_headers.map(
                                                                                                             (
-                                                                                                                h: string,
+                                                                                                                h: any,
                                                                                                                 i: number,
-                                                                                                            ) => (
-                                                                                                                <th
-                                                                                                                    key={
-                                                                                                                        i
-                                                                                                                    }
-                                                                                                                    className="px-6 py-3 font-semibold border-b border-gray-200 dark:border-gray-700"
-                                                                                                                >
-                                                                                                                    {
-                                                                                                                        h
-                                                                                                                    }
-                                                                                                                </th>
-                                                                                                            ),
+                                                                                                            ) => {
+                                                                                                                const headerText =
+                                                                                                                    typeof h ===
+                                                                                                                        'object' &&
+                                                                                                                    h !==
+                                                                                                                        null
+                                                                                                                        ? h.text ||
+                                                                                                                          h.content ||
+                                                                                                                          JSON.stringify(
+                                                                                                                              h,
+                                                                                                                          )
+                                                                                                                        : String(
+                                                                                                                              h,
+                                                                                                                          );
+                                                                                                                return (
+                                                                                                                    <th
+                                                                                                                        key={
+                                                                                                                            i
+                                                                                                                        }
+                                                                                                                        className="px-6 py-3 font-semibold border-b border-gray-200 dark:border-gray-700"
+                                                                                                                    >
+                                                                                                                        {
+                                                                                                                            headerText
+                                                                                                                        }
+                                                                                                                    </th>
+                                                                                                                );
+                                                                                                            },
                                                                                                         )}
                                                                                                     </tr>
                                                                                                 </thead>
@@ -670,12 +733,13 @@ export default function PDFViewerPage() {
                                                                                                         i: number,
                                                                                                     ) => {
                                                                                                         // Handle row format which is { row: [...] }
-                                                                                                        const cells = Array.isArray(
-                                                                                                            row,
-                                                                                                        )
-                                                                                                            ? row
-                                                                                                            : row.row ||
-                                                                                                              [];
+                                                                                                        const cells =
+                                                                                                            Array.isArray(
+                                                                                                                row,
+                                                                                                            )
+                                                                                                                ? row
+                                                                                                                : row.row ||
+                                                                                                                  [];
                                                                                                         return (
                                                                                                             <tr
                                                                                                                 key={
@@ -685,20 +749,35 @@ export default function PDFViewerPage() {
                                                                                                             >
                                                                                                                 {cells.map(
                                                                                                                     (
-                                                                                                                        cell: string,
+                                                                                                                        cell: any,
                                                                                                                         j: number,
-                                                                                                                    ) => (
-                                                                                                                        <td
-                                                                                                                            key={
-                                                                                                                                j
-                                                                                                                            }
-                                                                                                                            className="px-6 py-4"
-                                                                                                                        >
-                                                                                                                            {
-                                                                                                                                cell
-                                                                                                                            }
-                                                                                                                        </td>
-                                                                                                                    ),
+                                                                                                                    ) => {
+                                                                                                                        const cellText =
+                                                                                                                            typeof cell ===
+                                                                                                                                'object' &&
+                                                                                                                            cell !==
+                                                                                                                                null
+                                                                                                                                ? cell.text ||
+                                                                                                                                  cell.content ||
+                                                                                                                                  JSON.stringify(
+                                                                                                                                      cell,
+                                                                                                                                  )
+                                                                                                                                : String(
+                                                                                                                                      cell,
+                                                                                                                                  );
+                                                                                                                        return (
+                                                                                                                            <td
+                                                                                                                                key={
+                                                                                                                                    j
+                                                                                                                                }
+                                                                                                                                className="px-6 py-4"
+                                                                                                                            >
+                                                                                                                                {
+                                                                                                                                    cellText
+                                                                                                                                }
+                                                                                                                            </td>
+                                                                                                                        );
+                                                                                                                    },
                                                                                                                 )}
                                                                                                             </tr>
                                                                                                         );
@@ -786,7 +865,41 @@ export default function PDFViewerPage() {
 
                 {activeTab === 'questions' && (
                     <div className="space-y-6">
-                        {chapters.length > 0 ? (
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg mb-4 text-sm border border-yellow-200 dark:border-yellow-800">
+                            <p className="font-semibold mb-2">Debug Info:</p>
+                            <p>Chapters count: {chapters.length}</p>
+                            <p>
+                                Has learn controls:{' '}
+                                {chapters.some(
+                                    (c) =>
+                                        c.learn_controls &&
+                                        Object.keys(c.learn_controls).length >
+                                            0,
+                                )
+                                    ? 'Yes'
+                                    : 'No'}
+                            </p>
+                            <details className="mt-2">
+                                <summary className="cursor-pointer font-medium">
+                                    Raw Data Dump
+                                </summary>
+                                <pre className="mt-2 p-2 bg-slate-950 text-slate-50 rounded text-xs overflow-auto max-h-60">
+                                    {JSON.stringify(
+                                        chapters.map((c) => ({
+                                            ch: c.chapter_num,
+                                            controls: c.learn_controls,
+                                        })),
+                                        null,
+                                        2,
+                                    )}
+                                </pre>
+                            </details>
+                        </div>
+                        {chapters.some(
+                            (c) =>
+                                c.learn_controls &&
+                                Object.keys(c.learn_controls).length > 0,
+                        ) ? (
                             chapters.map((chapter) => {
                                 const hasQuestions =
                                     chapter.learn_controls &&
@@ -816,35 +929,118 @@ export default function PDFViewerPage() {
                                                     ([
                                                         subchapter,
                                                         questions,
-                                                    ]) => (
-                                                        <div key={subchapter}>
-                                                            <h4 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                                                                <div className="h-2 w-2 rounded-full bg-primary" />
-                                                                {subchapter}
-                                                            </h4>
-                                                            <div className="grid gap-3 pl-4">
-                                                                {questions.map(
-                                                                    (q, i) => (
-                                                                        <div
-                                                                            key={
-                                                                                i
-                                                                            }
-                                                                            className="p-3 bg-muted/50 rounded-lg text-sm"
-                                                                        >
-                                                                            <span className="font-bold mr-2">
-                                                                                Q
-                                                                                {i +
-                                                                                    1}
+                                                    ]) => {
+                                                        const questionsArray =
+                                                            Array.isArray(
+                                                                questions,
+                                                            )
+                                                                ? questions
+                                                                : [];
+                                                        if (
+                                                            questionsArray.length ===
+                                                            0
+                                                        )
+                                                            return null;
 
-                                                                                .
-                                                                            </span>
-                                                                            {q}
-                                                                        </div>
-                                                                    ),
-                                                                )}
+                                                        return (
+                                                            <div
+                                                                key={subchapter}
+                                                            >
+                                                                <h4 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                                                                    <div className="h-2 w-2 rounded-full bg-primary" />
+                                                                    {subchapter}
+                                                                </h4>
+                                                                <div className="grid gap-3 pl-4">
+                                                                    {questionsArray.map(
+                                                                        (
+                                                                            q: any,
+                                                                            i,
+                                                                        ) => {
+                                                                            // Handle object-based questions (new format)
+                                                                            let questionText =
+                                                                                typeof q ===
+                                                                                'string'
+                                                                                    ? q
+                                                                                    : q.question;
+
+                                                                            // Safeguard: Ensure questionText is a string
+                                                                            if (
+                                                                                typeof questionText ===
+                                                                                    'object' &&
+                                                                                questionText !==
+                                                                                    null
+                                                                            ) {
+                                                                                questionText =
+                                                                                    questionText.text ||
+                                                                                    questionText.content ||
+                                                                                    JSON.stringify(
+                                                                                        questionText,
+                                                                                    );
+                                                                            }
+
+                                                                            let answerText =
+                                                                                typeof q ===
+                                                                                'string'
+                                                                                    ? null
+                                                                                    : q.answer;
+
+                                                                            // Safeguard: Ensure answerText is a string
+                                                                            if (
+                                                                                typeof answerText ===
+                                                                                    'object' &&
+                                                                                answerText !==
+                                                                                    null
+                                                                            ) {
+                                                                                answerText =
+                                                                                    answerText.text ||
+                                                                                    answerText.content ||
+                                                                                    JSON.stringify(
+                                                                                        answerText,
+                                                                                    );
+                                                                            }
+
+                                                                            return (
+                                                                                <div
+                                                                                    key={
+                                                                                        i
+                                                                                    }
+                                                                                    className="p-4 bg-muted/50 rounded-lg text-sm space-y-3"
+                                                                                >
+                                                                                    <div className="flex gap-2">
+                                                                                        <span className="font-bold text-primary shrink-0">
+                                                                                            Q
+                                                                                            {i +
+                                                                                                1}
+
+                                                                                            .
+                                                                                        </span>
+                                                                                        <span className="font-medium text-foreground">
+                                                                                            {
+                                                                                                questionText
+                                                                                            }
+                                                                                        </span>
+                                                                                    </div>
+
+                                                                                    {answerText && (
+                                                                                        <div className="flex gap-2 pl-2 border-l-2 border-green-500/30 ml-1">
+                                                                                            <span className="font-bold text-green-600 dark:text-green-400 shrink-0">
+                                                                                                A.
+                                                                                            </span>
+                                                                                            <span className="text-muted-foreground">
+                                                                                                {
+                                                                                                    answerText
+                                                                                                }
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        },
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ),
+                                                        );
+                                                    },
                                                 )}
                                             </div>
                                         </CardContent>

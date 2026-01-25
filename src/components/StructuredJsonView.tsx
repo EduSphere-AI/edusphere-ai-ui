@@ -291,6 +291,14 @@ export const transformToStructuredData = (
     courseSlides: any[],
     courseChapters: any[],
 ): StructuredChapter[] => {
+    const extractText = (val: any) => {
+        if (!val) return '';
+        if (typeof val === 'string') return val;
+        if (typeof val === 'object')
+            return val.text || val.content || JSON.stringify(val);
+        return String(val);
+    };
+
     // Group slides by chapter
     const chapterMap = new Map<number, StructuredSlide[]>();
 
@@ -319,12 +327,12 @@ export const transformToStructuredData = (
             ) {
                 elements.push({
                     type: 'h2',
-                    content: item.text || item.content,
+                    content: extractText(item.text || item.content),
                 });
             } else if (typeLower === 'section_title' || typeLower === 'h2') {
                 elements.push({
                     type: 'h3',
-                    content: item.text || item.content,
+                    content: extractText(item.text || item.content),
                 });
             } else if (
                 typeLower === 'bullet points' ||
@@ -332,13 +340,13 @@ export const transformToStructuredData = (
                 typeLower === 'bullet'
             ) {
                 // Check if it's already an array
-                let items = [];
-                if (Array.isArray(item.text)) items = item.text;
+                let items: string[] = [];
+                if (Array.isArray(item.text)) items = item.text.map(extractText);
                 else if (typeof item.text === 'string')
                     items = item.text
                         .split('\n')
                         .map((s: string) => s.replace(/^[•-]\s*/, ''));
-                else if (Array.isArray(item.content)) items = item.content;
+                else if (Array.isArray(item.content)) items = item.content.map(extractText);
                 else if (typeof item.content === 'string')
                     items = item.content
                         .split('\n')
@@ -352,28 +360,54 @@ export const transformToStructuredData = (
                 typeLower === 'img' ||
                 typeLower === 'figure'
             ) {
-                elements.push({
-                    type: 'image',
-                    content:
-                        item.metadata?.image_url ||
-                        item.metadata?.url ||
-                        item.url ||
-                        item.text ||
-                        item.content ||
-                        '',
-                });
+                // Ensure we get the correct URL from various possible locations
+                let imageUrl = '';
+
+                // 1. Try metadata.image_url (standard)
+                if (item.metadata?.image_url) {
+                    imageUrl = item.metadata.image_url;
+                }
+                // 2. Try metadata.url
+                else if (item.metadata?.url) {
+                    imageUrl = item.metadata.url;
+                }
+                // 3. Try direct url property
+                else if (item.url) {
+                    imageUrl = item.url;
+                }
+                // 4. Fallback: if text/content looks like a URL
+                else if (
+                    (typeof item.text === 'string' &&
+                        item.text.startsWith('http')) ||
+                    (typeof item.content === 'string' &&
+                        item.content.startsWith('http'))
+                ) {
+                    imageUrl = item.text || item.content;
+                }
+
+                if (imageUrl) {
+                    elements.push({
+                        type: 'image',
+                        content: imageUrl,
+                    });
+                }
             } else if (typeLower === 'table') {
                 const rawRows = item.metadata?.table_data || [];
                 const rows = rawRows.map((r: any) => {
                     let rowData = [];
                     if (Array.isArray(r)) rowData = r;
                     else if (r && Array.isArray(r.row)) rowData = r.row;
-                    
+
                     // Sanitize cells to ensure they are strings
                     return rowData.map((cell: any) => {
                         if (cell === null || cell === undefined) return '';
                         if (typeof cell === 'object') {
-                            return cell.text || cell.content || cell.value || JSON.stringify(cell);
+                            return (
+                                cell.text ||
+                                cell.content ||
+                                cell.value ||
+                                JSON.stringify(cell)
+                            );
                         }
                         return String(cell);
                     });
@@ -384,7 +418,13 @@ export const transformToStructuredData = (
                 const headers = rawHeaders.map((h: any) => {
                     if (h === null || h === undefined) return '';
                     if (typeof h === 'object') {
-                        return h.column_name || h.name || h.title || h.text || JSON.stringify(h);
+                        return (
+                            h.column_name ||
+                            h.name ||
+                            h.title ||
+                            h.text ||
+                            JSON.stringify(h)
+                        );
                     }
                     return String(h);
                 });
@@ -401,7 +441,7 @@ export const transformToStructuredData = (
                 // Default to paragraph
                 elements.push({
                     type: 'p',
-                    content: item.text || item.content || '',
+                    content: extractText(item.text || item.content),
                 });
             }
         });
