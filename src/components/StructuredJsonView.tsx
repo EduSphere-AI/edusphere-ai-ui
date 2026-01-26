@@ -12,9 +12,14 @@ import {
     X,
     RotateCcw,
     Plus,
+    Wand2,
+    Check,
+    Zap,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { API_BASE_URL } from '@/lib/constants';
+import { toast } from 'sonner';
 
 // Content element types that backend can send
 type ContentType =
@@ -44,6 +49,8 @@ interface ContentElement {
 export interface StructuredSlide {
     slideTitle: string;
     elements: ContentElement[];
+    slide_number?: number;
+    chapter_num?: number;
 }
 
 export interface StructuredChapter {
@@ -51,6 +58,214 @@ export interface StructuredChapter {
     slides: StructuredSlide[];
     questionnaire?: any[];
 }
+
+// Helper to transform raw content items to ContentElements
+const transformContentToElements = (contentItems: any[]): ContentElement[] => {
+    const elements: ContentElement[] = [];
+
+    contentItems.forEach((item: any) => {
+        const typeLower = item.type?.toLowerCase() || 'text';
+
+        if (
+            typeLower === 'title' ||
+            typeLower === 'h1' ||
+            typeLower === 'slide_title'
+        ) {
+            elements.push({
+                type: 'h2',
+                content: item.text || item.content,
+            });
+        } else if (typeLower === 'section_title' || typeLower === 'h2') {
+            elements.push({
+                type: 'h3',
+                content: item.text || item.content,
+            });
+        } else if (
+            typeLower === 'bullet points' ||
+            typeLower === 'bullet_points' ||
+            typeLower === 'bullet'
+        ) {
+            // Check if it's already an array
+            let items = [];
+            if (Array.isArray(item.text)) items = item.text;
+            else if (typeof item.text === 'string')
+                items = item.text
+                    .split('\n')
+                    .map((s: string) => s.replace(/^[•-]\s*/, ''));
+            else if (Array.isArray(item.content)) items = item.content;
+            else if (typeof item.content === 'string')
+                items = item.content
+                    .split('\n')
+                    .map((s: string) => s.replace(/^[•-]\s*/, ''));
+
+            if (items.length > 0) {
+                elements.push({ type: 'ul', content: items });
+            }
+        } else if (
+            typeLower === 'image' ||
+            typeLower === 'img' ||
+            typeLower === 'figure'
+        ) {
+            elements.push({
+                type: 'image',
+                content:
+                    item.metadata?.image_url ||
+                    item.metadata?.url ||
+                    item.url ||
+                    item.text ||
+                    item.content ||
+                    '',
+            });
+        } else if (typeLower === 'table') {
+            const rawRows = item.table_data || item.metadata?.table_data || [];
+            // Check if table data is empty but content/text might be a markdown table string
+            const possibleContent =
+                item.content || item.text || item.value || '';
+
+            if (
+                rawRows.length === 0 &&
+                typeof possibleContent === 'string' &&
+                possibleContent.includes('|')
+            ) {
+                // Attempt to parse markdown table
+                let lines = possibleContent
+                    .split('\n')
+                    .map((l: string) => l.trim())
+                    .filter((l: string) => l.length > 0);
+
+                // Handle case where newlines might be missing or different
+                if (lines.length < 2 && possibleContent.includes('| |')) {
+                    lines = possibleContent
+                        .split('| |')
+                        .map((l: string) => l.trim())
+                        .filter((l: string) => l.length > 0);
+                }
+
+                if (lines.length >= 2) {
+                    // Simple parser: assumes pipe-separated values
+                    const parseLine = (line: string) =>
+                        line
+                            .split('|')
+                            .map((c) => c.trim())
+                            .filter((c, i, arr) => {
+                                // Filter out empty first/last cells if they exist due to leading/trailing pipes
+                                if (i === 0 && c === '') return false;
+                                if (i === arr.length - 1 && c === '')
+                                    return false;
+                                return true;
+                            });
+
+                    const headers = parseLine(lines[0]);
+
+                    // Better separator check: check if cells contain mostly dashes
+                    const isSeparator = (line: string) => {
+                        // Remove pipes and spaces
+                        const stripped = line.replace(/[|\s]/g, '');
+                        // Check if remaining is mostly dashes (allow some colons for alignment :---)
+                        return /^[:\-]+$/.test(stripped);
+                    };
+
+                    const dataRows = lines
+                        .slice(1)
+                        .filter((l: string) => !isSeparator(l))
+                        .map(parseLine);
+
+                    if (headers.length > 0 && dataRows.length > 0) {
+                        elements.push({
+                            type: 'table',
+                            content: {
+                                caption: item.metadata?.caption || 'Table Data',
+                                headers: headers,
+                                rows: dataRows,
+                            },
+                        });
+                        return; // Skip default processing
+                    }
+                }
+            }
+
+            // Sanitize headers first to use for row mapping if needed
+            let rawHeaders =
+                item.table_headers || item.metadata?.table_headers || [];
+
+            // If headers are missing but we have object rows, derive headers from keys
+            if (
+                rawHeaders.length === 0 &&
+                rawRows.length > 0 &&
+                typeof rawRows[0] === 'object' &&
+                !Array.isArray(rawRows[0]) &&
+                !rawRows[0].row
+            ) {
+                rawHeaders = Object.keys(rawRows[0]);
+            }
+
+            const headers = rawHeaders.map((h: any) => {
+                if (h === null || h === undefined) return '';
+                if (typeof h === 'object') {
+                    return (
+                        h.column_name ||
+                        h.name ||
+                        h.title ||
+                        h.text ||
+                        JSON.stringify(h)
+                    );
+                }
+                return String(h);
+            });
+
+            const rows = rawRows.map((r: any) => {
+                let rowData = [];
+                if (Array.isArray(r)) rowData = r;
+                else if (r && Array.isArray(r.row)) rowData = r.row;
+                else if (r && typeof r === 'object') {
+                    // Handle list of dicts format
+                    // Use headers to determine order and keys
+                    rowData = headers.map((h: string) => {
+                        const val = r[h];
+                        return val !== undefined ? val : '';
+                    });
+                }
+
+                // Sanitize cells to ensure they are strings
+                return rowData.map((cell: any) => {
+                    if (cell === null || cell === undefined) return '';
+                    if (typeof cell === 'object') {
+                        return (
+                            cell.text ||
+                            cell.content ||
+                            cell.value ||
+                            JSON.stringify(cell)
+                        );
+                    }
+                    return String(cell);
+                });
+            });
+
+            elements.push({
+                type: 'table',
+                content: {
+                    caption:
+                        item.metadata?.caption ||
+                        (typeof item.content === 'string' &&
+                        !item.content.includes('|')
+                            ? item.content
+                            : '') ||
+                        '',
+                    headers: headers,
+                    rows: rows,
+                },
+            });
+        } else {
+            // Default to paragraph
+            elements.push({
+                type: 'p',
+                content: item.text || item.content || '',
+            });
+        }
+    });
+
+    return elements;
+};
 
 // Editable Content Component
 const ContentEditor = ({
@@ -293,6 +508,7 @@ export const transformToStructuredData = (
 ): StructuredChapter[] => {
     // Group slides by chapter
     const chapterMap = new Map<number, StructuredSlide[]>();
+    const chapterTitleMap = new Map<string, number>();
 
     // Helper to normalize chapter numbers
     const normalizeChapter = (num: any) => {
@@ -302,119 +518,73 @@ export const transformToStructuredData = (
 
     // Initialize chapters
     courseChapters.forEach((ch) => {
-        chapterMap.set(normalizeChapter(ch.chapter_num), []);
+        const num = normalizeChapter(ch.chapter_num);
+        chapterMap.set(num, []);
+        if (ch.main_title) {
+            chapterTitleMap.set(ch.main_title.toLowerCase().trim(), num);
+        }
     });
 
     // Transform slides
     courseSlides.forEach((slide) => {
-        const elements: ContentElement[] = [];
+        const elements = transformContentToElements(slide.content);
 
-        slide.content.forEach((item: any) => {
-            const typeLower = item.type?.toLowerCase() || 'text';
+        // Determine correct chapter bucket
+        let chapterNum = 1;
 
-            if (
-                typeLower === 'title' ||
-                typeLower === 'h1' ||
-                typeLower === 'slide_title'
-            ) {
-                elements.push({
-                    type: 'h2',
-                    content: item.text || item.content,
-                });
-            } else if (typeLower === 'section_title' || typeLower === 'h2') {
-                elements.push({
-                    type: 'h3',
-                    content: item.text || item.content,
-                });
-            } else if (
-                typeLower === 'bullet points' ||
-                typeLower === 'bullet_points' ||
-                typeLower === 'bullet'
-            ) {
-                // Check if it's already an array
-                let items = [];
-                if (Array.isArray(item.text)) items = item.text;
-                else if (typeof item.text === 'string')
-                    items = item.text
-                        .split('\n')
-                        .map((s: string) => s.replace(/^[•-]\s*/, ''));
-                else if (Array.isArray(item.content)) items = item.content;
-                else if (typeof item.content === 'string')
-                    items = item.content
-                        .split('\n')
-                        .map((s: string) => s.replace(/^[•-]\s*/, ''));
-
-                if (items.length > 0) {
-                    elements.push({ type: 'ul', content: items });
-                }
-            } else if (
-                typeLower === 'image' ||
-                typeLower === 'img' ||
-                typeLower === 'figure'
-            ) {
-                elements.push({
-                    type: 'image',
-                    content:
-                        item.metadata?.image_url ||
-                        item.metadata?.url ||
-                        item.url ||
-                        item.text ||
-                        item.content ||
-                        '',
-                });
-            } else if (typeLower === 'table') {
-                const rawRows = item.metadata?.table_data || [];
-                const rows = rawRows.map((r: any) => {
-                    let rowData = [];
-                    if (Array.isArray(r)) rowData = r;
-                    else if (r && Array.isArray(r.row)) rowData = r.row;
-                    
-                    // Sanitize cells to ensure they are strings
-                    return rowData.map((cell: any) => {
-                        if (cell === null || cell === undefined) return '';
-                        if (typeof cell === 'object') {
-                            return cell.text || cell.content || cell.value || JSON.stringify(cell);
-                        }
-                        return String(cell);
-                    });
-                });
-
-                // Sanitize headers
-                const rawHeaders = item.metadata?.table_headers || [];
-                const headers = rawHeaders.map((h: any) => {
-                    if (h === null || h === undefined) return '';
-                    if (typeof h === 'object') {
-                        return h.column_name || h.name || h.title || h.text || JSON.stringify(h);
-                    }
-                    return String(h);
-                });
-
-                elements.push({
-                    type: 'table',
-                    content: {
-                        caption: item.metadata?.caption || item.text || 'Table',
-                        headers: headers,
-                        rows: rows,
-                    },
-                });
+        // Strategy 1: Match by Title (Most accurate)
+        const slideChapterTitle =
+            slide.chapter_main_title || slide.chapter_title;
+        if (
+            slideChapterTitle &&
+            chapterTitleMap.has(slideChapterTitle.toLowerCase().trim())
+        ) {
+            chapterNum = chapterTitleMap.get(
+                slideChapterTitle.toLowerCase().trim(),
+            )!;
+        } else {
+            // Strategy 2: Numeric fallback
+            const rawNum = slide.chapter;
+            if (rawNum === null || rawNum === undefined || rawNum === 'null') {
+                chapterNum = 1;
             } else {
-                // Default to paragraph
-                elements.push({
-                    type: 'p',
-                    content: item.text || item.content || '',
-                });
+                const n = parseInt(String(rawNum), 10);
+                if (!isNaN(n)) {
+                    // Check if this number exists directly in our map
+                    if (chapterMap.has(n)) {
+                        chapterNum = n;
+                    }
+                    // Check if n+1 exists (common 0-vs-1 indexing offset)
+                    else if (chapterMap.has(n + 1)) {
+                        chapterNum = n + 1;
+                    } else {
+                        chapterNum = n; // Fallback to raw number
+                    }
+                }
             }
-        });
+        }
+
+        if (!chapterMap.has(chapterNum)) {
+            // If bucket doesn't exist (e.g. Chapter 0?), try to put in Chapter 1 or create new
+            if (chapterMap.has(1)) chapterNum = 1;
+            else {
+                chapterMap.set(chapterNum, []);
+            }
+        }
 
         const structuredSlide: StructuredSlide = {
-            slideTitle: slide.slide_title,
+            slideTitle: slide.title || slide.slide_title || 'Untitled Slide',
             elements: elements,
+            slide_number:
+                slide.sequence !== undefined
+                    ? slide.sequence
+                    : slide.slide_number,
+            chapter_num:
+                slide.chapter !== undefined && slide.chapter !== null
+                    ? slide.chapter
+                    : chapterNum, // Use calculated chapter if missing
         };
 
-        const chapterNum = normalizeChapter(slide.chapter || 1);
-        if (!chapterMap.has(chapterNum)) {
-            chapterMap.set(chapterNum, []);
-        }
         chapterMap.get(chapterNum)?.push(structuredSlide);
     });
 
@@ -447,30 +617,295 @@ interface StructuredJsonViewProps {
     data: StructuredChapter[];
     onSave?: (newData: StructuredChapter[]) => Promise<void>;
     canEdit?: boolean;
+    resultId?: string;
+    rawSlides?: any[]; // Raw slides to lookup metadata if missing
+    initialChapterIndex?: number;
+    initialSlideIndex?: number;
 }
 
 export const StructuredJsonView: React.FC<StructuredJsonViewProps> = ({
     data,
     onSave,
     canEdit = true,
+    resultId,
+    rawSlides,
+    initialChapterIndex = 0,
+    initialSlideIndex = 0,
 }) => {
     // State for navigation
-    const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
-    const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+    const [currentChapterIndex, setCurrentChapterIndex] =
+        useState(initialChapterIndex);
+    const [currentSlideIndex, setCurrentSlideIndex] =
+        useState(initialSlideIndex);
 
     // Edit Mode State
     const [isEditing, setIsEditing] = useState(false);
     const [localData, setLocalData] = useState<StructuredChapter[]>(data);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Summarization State
+    const [isSummarizing, setIsSummarizing] = useState(false);
+    const [summaryPreview, setSummaryPreview] = useState<{
+        original: any[];
+        summarized: any[];
+        newElements: ContentElement[];
+    } | null>(null);
+
     // Reset to start when data changes (only if not editing)
     useEffect(() => {
-        if (!isEditing) {
-            setCurrentChapterIndex(0);
-            setCurrentSlideIndex(0);
+        if (!isEditing && !summaryPreview) {
+            // Only reset if data length changes significantly or if we want to enforce reset
+            // For now, let's respect initial props if provided on mount, but if data changes
+            // we might want to reset or keep current position.
+            // Existing logic was:
+            // setCurrentChapterIndex(0);
+            // setCurrentSlideIndex(0);
+            // setLocalData(data);
+
+            // We should keep localData in sync
             setLocalData(data);
         }
     }, [data]);
+
+    // Update URL when position changes
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('chapter', String(currentChapterIndex + 1));
+            url.searchParams.set('slide', String(currentSlideIndex + 1));
+            window.history.replaceState({}, '', url.toString());
+        }
+    }, [currentChapterIndex, currentSlideIndex]);
+
+    // Helper to get slide metadata, falling back to lookup if needed
+    const getSlideMetadata = (
+        slide: StructuredSlide,
+        chapter: StructuredChapter,
+    ) => {
+        console.group('getSlideMetadata Debug');
+        console.log('Checking slide:', slide);
+        console.log('Checking chapter:', chapter);
+        console.log('Direct properties:', {
+            chapter_num: slide.chapter_num,
+            slide_number: slide.slide_number,
+        });
+
+        // 1. Check direct properties
+        if (
+            typeof slide.chapter_num === 'number' &&
+            !isNaN(slide.chapter_num) &&
+            typeof slide.slide_number === 'number' &&
+            !isNaN(slide.slide_number)
+        ) {
+            console.log('Found valid metadata directly on slide');
+            console.groupEnd();
+            return {
+                chapter_num: slide.chapter_num,
+                slide_number: slide.slide_number,
+            };
+        }
+
+        console.log('Direct check failed, attempting lookup in rawSlides', {
+            rawSlidesLength: rawSlides?.length,
+        });
+
+        // 2. Attempt lookup in rawSlides
+        if (rawSlides && rawSlides.length > 0) {
+            // Heuristic: Match slide title and chapter title
+            const match = rawSlides.find(
+                (s) =>
+                    (s.title === slide.slideTitle ||
+                        s.slide_title === slide.slideTitle) &&
+                    (s.chapter_main_title === chapter.chapterTitle ||
+                        s.chapter_title === chapter.chapterTitle),
+            );
+
+            console.log('Lookup match result:', match);
+
+            if (match) {
+                // Try to find chapter number
+                const cNum =
+                    match.chapter !== undefined && match.chapter !== null
+                        ? Number(match.chapter)
+                        : undefined;
+
+                // Try to find slide number (sequence or slide_number)
+                let sNum =
+                    match.slide_number !== undefined &&
+                    match.slide_number !== null
+                        ? Number(match.slide_number)
+                        : undefined;
+
+                if (
+                    sNum === undefined &&
+                    match.sequence !== undefined &&
+                    match.sequence !== null
+                ) {
+                    sNum = Number(match.sequence);
+                }
+
+                if (
+                    cNum !== undefined &&
+                    !isNaN(cNum) &&
+                    sNum !== undefined &&
+                    !isNaN(sNum)
+                ) {
+                    console.log('Found valid metadata via lookup');
+                    console.groupEnd();
+                    return {
+                        chapter_num: cNum,
+                        slide_number: sNum,
+                    };
+                }
+            }
+        }
+        console.warn('Metadata lookup failed completely');
+        console.groupEnd();
+        return null;
+    };
+
+    const handleSummarize = async (
+        strength: 'standard' | 'strong' = 'standard',
+    ) => {
+        if (!resultId) {
+            toast.error('Result ID is missing. Cannot summarize.');
+            return;
+        }
+
+        const currentChapter = localData[currentChapterIndex];
+        const currentSlide = currentChapter.slides[currentSlideIndex];
+
+        const metadata = getSlideMetadata(currentSlide, currentChapter);
+
+        if (!metadata) {
+            toast.error(
+                'Slide metadata missing (chapter/slide number). Cannot summarize.',
+            );
+            return;
+        }
+
+        // Final sanity check for payload
+        const chapterNum = Number(metadata.chapter_num);
+        const slideNum = Number(metadata.slide_number);
+
+        if (isNaN(chapterNum) || isNaN(slideNum)) {
+            console.error('Invalid metadata values:', metadata);
+            toast.error('Invalid chapter/slide numbers. Cannot summarize.');
+            return;
+        }
+
+        setIsSummarizing(true);
+        try {
+            const payload = {
+                result_id: resultId,
+                chapter_num: chapterNum,
+                slide_num: slideNum,
+                strength: strength,
+            };
+
+            const response = await fetch(
+                `${API_BASE_URL}/content/summarize/preview`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                },
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Summarization failed:', errorData);
+                throw new Error(
+                    errorData.detail
+                        ? JSON.stringify(errorData.detail)
+                        : 'Failed to summarize',
+                );
+            }
+
+            const data = await response.json();
+            const newElements = transformContentToElements(
+                data.summarized_content,
+            );
+
+            setSummaryPreview({
+                original: data.original_content,
+                summarized: data.summarized_content,
+                newElements: newElements,
+            });
+            toast.success('Summary generated! Review the changes.');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to generate summary.');
+        } finally {
+            setIsSummarizing(false);
+        }
+    };
+
+    const handleConfirmSummary = async () => {
+        if (!summaryPreview || !resultId) return;
+
+        const currentChapter = localData[currentChapterIndex];
+        const currentSlide = currentChapter.slides[currentSlideIndex];
+        const metadata = getSlideMetadata(currentSlide, currentChapter);
+
+        if (!metadata) {
+            toast.error('Cannot confirm: Slide metadata missing.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/content/summarize/confirm`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        result_id: resultId,
+                        chapter_num: metadata.chapter_num,
+                        slide_num: metadata.slide_number,
+                        new_content: summaryPreview.summarized,
+                    }),
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error('Failed to confirm summary');
+            }
+
+            // Update local state
+            const newData = [...localData];
+            const chapter = { ...newData[currentChapterIndex] };
+            const slides = [...chapter.slides];
+            const slide = { ...slides[currentSlideIndex] };
+
+            slide.elements = summaryPreview.newElements;
+            // Optionally persist the recovered metadata to the local object so we don't look it up again
+            slide.chapter_num = metadata.chapter_num;
+            slide.slide_number = metadata.slide_number;
+
+            slides[currentSlideIndex] = slide;
+            chapter.slides = slides;
+            newData[currentChapterIndex] = chapter;
+
+            setLocalData(newData);
+            setSummaryPreview(null);
+            toast.success('Slide updated with summary.');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to save summary.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleCancelSummary = () => {
+        setSummaryPreview(null);
+    };
 
     const handleAddSlide = () => {
         const newSlide: StructuredSlide = {
@@ -654,8 +1089,26 @@ export const StructuredJsonView: React.FC<StructuredJsonViewProps> = ({
                     </div>
 
                     {/* Edit Controls */}
-                    {canEdit && onSave && (
+                    {canEdit && onSave && !summaryPreview && (
                         <div className="flex items-center gap-2">
+                            {/* Summarize Button */}
+                            {!isEditing && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleSummarize('standard')}
+                                    disabled={isSummarizing}
+                                    title="Summarize Slide"
+                                    className="h-8 w-8 p-0 text-purple-600 hover:bg-purple-50"
+                                >
+                                    {isSummarizing ? (
+                                        <div className="w-4 h-4 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
+                                    ) : (
+                                        <Wand2 className="w-4 h-4" />
+                                    )}
+                                </Button>
+                            )}
+
                             <Button
                                 size="sm"
                                 variant="ghost"
@@ -702,17 +1155,76 @@ export const StructuredJsonView: React.FC<StructuredJsonViewProps> = ({
                 </div>
             </div>
 
+            {/* Summary Preview Banner */}
+            {summaryPreview && (
+                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                            <Wand2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-purple-900 dark:text-purple-100">
+                                Summary Preview
+                            </h3>
+                            <p className="text-sm text-purple-700 dark:text-purple-300">
+                                Review the summarized content below.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSummarize('strong')}
+                            disabled={isSummarizing}
+                            className="text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
+                        >
+                            <Zap className="w-3 h-3 mr-1.5" />
+                            Summarize Stronger
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleCancelSummary}
+                            disabled={isSaving}
+                            className="text-gray-500 hover:text-gray-700"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={handleConfirmSummary}
+                            disabled={isSaving}
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                        >
+                            {isSaving ? (
+                                'Saving...'
+                            ) : (
+                                <>
+                                    <Check className="w-3 h-3 mr-1.5" />
+                                    Confirm
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* Slide Content */}
             <div className="relative min-h-[500px] flex flex-col">
                 {currentSlide ? (
                     <Card
                         className={`flex-1 overflow-hidden border-none shadow-xl bg-white dark:bg-gray-800/80 backdrop-blur-sm transition-all duration-300 ring-1 ring-gray-100 dark:ring-gray-700 ${
                             isEditing ? 'ring-2 ring-blue-500' : ''
-                        }`}
+                        } ${summaryPreview ? 'ring-2 ring-purple-500' : ''}`}
                     >
-                        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-gray-100 dark:border-gray-700/50 py-6">
+                        <CardHeader
+                            className={`bg-gradient-to-r ${summaryPreview ? 'from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20' : 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20'} border-b border-gray-100 dark:border-gray-700/50 py-6`}
+                        >
                             <div className="flex items-center gap-3 w-full">
-                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm text-blue-600 dark:text-blue-400 shrink-0">
+                                <div
+                                    className={`w-10 h-10 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm ${summaryPreview ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'} shrink-0`}
+                                >
                                     <Layers className="w-5 h-5" />
                                 </div>
                                 {isEditing ? (
@@ -733,7 +1245,11 @@ export const StructuredJsonView: React.FC<StructuredJsonViewProps> = ({
                         <CardContent className="p-8 md:p-12 overflow-y-auto max-h-[600px]">
                             {/* Render Elements */}
                             <div className="prose dark:prose-invert max-w-none space-y-6">
-                                {currentSlide.elements.map((element, elIdx) => (
+                                {/* Use preview elements if available, otherwise current slide elements */}
+                                {(summaryPreview
+                                    ? summaryPreview.newElements
+                                    : currentSlide.elements
+                                ).map((element, elIdx) => (
                                     <div
                                         key={elIdx}
                                         className="animate-in fade-in slide-in-from-bottom-4 duration-500"

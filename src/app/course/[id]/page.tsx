@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,6 @@ import {
     Image as ImageIcon,
     Loader2,
     Presentation,
-    MessageCircleQuestion,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -78,8 +77,19 @@ const formatText = (text: string) => {
 export default function PDFViewerPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     // const { user } = useAuthStore(); // Auth removed
     const docId = params.id as string;
+
+    // Calculate initial indices from query params
+    const initialChapterParam = searchParams.get('chapter');
+    const initialSlideParam = searchParams.get('slide');
+    const initialChapterIndex = initialChapterParam
+        ? Math.max(0, parseInt(initialChapterParam) - 1)
+        : 0;
+    const initialSlideIndex = initialSlideParam
+        ? Math.max(0, parseInt(initialSlideParam) - 1)
+        : 0;
 
     // FIXED: Renamed from 'document' to 'pdfDocument' to avoid shadowing global document object
     const [pdfDocument, setPdfDocument] = useState<PDFDocument | null>(null);
@@ -100,6 +110,13 @@ export default function PDFViewerPage() {
     );
 
     const [selectedPage, setSelectedPage] = useState<number | 'all'>('all'); // Add state for Extraction tab pagination
+
+    // Switch to slides tab if query params are present
+    useEffect(() => {
+        if (searchParams.get('chapter') || searchParams.get('slide')) {
+            setActiveTab('slides');
+        }
+    }, [searchParams]);
 
     // Fetch document details
     useEffect(() => {
@@ -438,19 +455,7 @@ export default function PDFViewerPage() {
                             Summaries
                         </div>
                     </button>
-                    <button
-                        onClick={() => setActiveTab('questions')}
-                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                            activeTab === 'questions'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <MessageCircleQuestion className="h-4 w-4" />
-                            Review & Quiz
-                        </div>
-                    </button>
+
                     <button
                         onClick={() => setActiveTab('extraction')}
                         className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -495,9 +500,11 @@ export default function PDFViewerPage() {
                             >
                                 All Chapters
                             </Button>
-                            {chapters.map((chapter) => (
+                            {chapters.map((chapter, idx) => (
                                 <Button
-                                    key={chapter.chapter_num}
+                                    key={
+                                        chapter.chapter_num ?? `chapter-${idx}`
+                                    }
                                     variant={
                                         selectedChapter === chapter.chapter_num
                                             ? 'secondary'
@@ -510,7 +517,9 @@ export default function PDFViewerPage() {
                                 >
                                     <div className="flex flex-col items-start w-full">
                                         <span className="font-medium text-sm">
-                                            {chapter.chapter_num}.{' '}
+                                            {chapter.chapter_num
+                                                ? `${chapter.chapter_num}. `
+                                                : ''}
                                             {chapter.main_title}
                                         </span>
                                         {chapter.subtitle && (
@@ -669,13 +678,50 @@ export default function PDFViewerPage() {
                                                                                                         row: any,
                                                                                                         i: number,
                                                                                                     ) => {
-                                                                                                        // Handle row format which is { row: [...] }
-                                                                                                        const cells = Array.isArray(
-                                                                                                            row,
-                                                                                                        )
-                                                                                                            ? row
-                                                                                                            : row.row ||
-                                                                                                              [];
+                                                                                                        // Handle row format which is { row: [...] } or list of dicts
+                                                                                                        let cells =
+                                                                                                            [];
+                                                                                                        if (
+                                                                                                            Array.isArray(
+                                                                                                                row,
+                                                                                                            )
+                                                                                                        ) {
+                                                                                                            cells =
+                                                                                                                row;
+                                                                                                        } else if (
+                                                                                                            row &&
+                                                                                                            row.row
+                                                                                                        ) {
+                                                                                                            cells =
+                                                                                                                row.row;
+                                                                                                        } else if (
+                                                                                                            row &&
+                                                                                                            typeof row ===
+                                                                                                                'object'
+                                                                                                        ) {
+                                                                                                            // List of dicts - use headers to order
+                                                                                                            const headers =
+                                                                                                                item
+                                                                                                                    .metadata
+                                                                                                                    .table_headers ||
+                                                                                                                Object.keys(
+                                                                                                                    row,
+                                                                                                                );
+                                                                                                            cells =
+                                                                                                                headers.map(
+                                                                                                                    (
+                                                                                                                        h: string,
+                                                                                                                    ) =>
+                                                                                                                        row[
+                                                                                                                            h
+                                                                                                                        ] !==
+                                                                                                                        undefined
+                                                                                                                            ? row[
+                                                                                                                                  h
+                                                                                                                              ]
+                                                                                                                            : '',
+                                                                                                                );
+                                                                                                        }
                                                                                                         return (
                                                                                                             <tr
                                                                                                                 key={
@@ -780,82 +826,11 @@ export default function PDFViewerPage() {
                             }
                             onSave={handleSaveSlides}
                             canEdit={true}
+                            resultId={docId}
+                            rawSlides={slides}
+                            initialChapterIndex={initialChapterIndex}
+                            initialSlideIndex={initialSlideIndex}
                         />
-                    </div>
-                )}
-
-                {activeTab === 'questions' && (
-                    <div className="space-y-6">
-                        {chapters.length > 0 ? (
-                            chapters.map((chapter) => {
-                                const hasQuestions =
-                                    chapter.learn_controls &&
-                                    Object.keys(chapter.learn_controls).length >
-                                        0;
-
-                                if (!hasQuestions) return null;
-
-                                return (
-                                    <Card key={chapter.chapter_num}>
-                                        <CardHeader>
-                                            <CardTitle>
-                                                Chapter {chapter.chapter_num}:{' '}
-                                                {chapter.main_title}
-                                            </CardTitle>
-                                            {chapter.subtitle && (
-                                                <p className="text-sm text-muted-foreground">
-                                                    {chapter.subtitle}
-                                                </p>
-                                            )}
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-6">
-                                                {Object.entries(
-                                                    chapter.learn_controls,
-                                                ).map(
-                                                    ([
-                                                        subchapter,
-                                                        questions,
-                                                    ]) => (
-                                                        <div key={subchapter}>
-                                                            <h4 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                                                                <div className="h-2 w-2 rounded-full bg-primary" />
-                                                                {subchapter}
-                                                            </h4>
-                                                            <div className="grid gap-3 pl-4">
-                                                                {questions.map(
-                                                                    (q, i) => (
-                                                                        <div
-                                                                            key={
-                                                                                i
-                                                                            }
-                                                                            className="p-3 bg-muted/50 rounded-lg text-sm"
-                                                                        >
-                                                                            <span className="font-bold mr-2">
-                                                                                Q
-                                                                                {i +
-                                                                                    1}
-
-                                                                                .
-                                                                            </span>
-                                                                            {q}
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })
-                        ) : (
-                            <div className="text-center py-12 text-muted-foreground">
-                                No review questions available.
-                            </div>
-                        )}
                     </div>
                 )}
 
@@ -1304,6 +1279,159 @@ export default function PDFViewerPage() {
                                                                             type,
                                                                         )
                                                                     ) {
+                                                                        const tableData =
+                                                                            item.table_data ||
+                                                                            item
+                                                                                .metadata
+                                                                                ?.table_data;
+                                                                        const tableHeaders =
+                                                                            item.table_headers ||
+                                                                            item
+                                                                                .metadata
+                                                                                ?.table_headers;
+
+                                                                        if (
+                                                                            tableData &&
+                                                                            Array.isArray(
+                                                                                tableData,
+                                                                            ) &&
+                                                                            tableData.length >
+                                                                                0
+                                                                        ) {
+                                                                            // Derive headers if missing
+                                                                            const headers =
+                                                                                tableHeaders ||
+                                                                                (Array.isArray(
+                                                                                    tableData[0],
+                                                                                )
+                                                                                    ? []
+                                                                                    : tableData[0]
+                                                                                            .row
+                                                                                      ? []
+                                                                                      : Object.keys(
+                                                                                            tableData[0],
+                                                                                        ));
+
+                                                                            return (
+                                                                                <div
+                                                                                    key={
+                                                                                        idx
+                                                                                    }
+                                                                                    className="my-6 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+                                                                                >
+                                                                                    {item
+                                                                                        .metadata
+                                                                                        ?.caption && (
+                                                                                        <div className="bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground border-b italic">
+                                                                                            {
+                                                                                                item
+                                                                                                    .metadata
+                                                                                                    .caption
+                                                                                            }
+                                                                                        </div>
+                                                                                    )}
+                                                                                    <table className="w-full text-sm text-left">
+                                                                                        <thead className="text-xs uppercase bg-muted/50 font-semibold text-muted-foreground">
+                                                                                            <tr>
+                                                                                                {headers.map(
+                                                                                                    (
+                                                                                                        h: any,
+                                                                                                        i: number,
+                                                                                                    ) => (
+                                                                                                        <th
+                                                                                                            key={
+                                                                                                                i
+                                                                                                            }
+                                                                                                            className="px-6 py-3 border-b border-gray-200 dark:border-gray-700"
+                                                                                                        >
+                                                                                                            {typeof h ===
+                                                                                                            'object'
+                                                                                                                ? h.name ||
+                                                                                                                  h.text ||
+                                                                                                                  JSON.stringify(
+                                                                                                                      h,
+                                                                                                                  )
+                                                                                                                : String(
+                                                                                                                      h,
+                                                                                                                  )}
+                                                                                                        </th>
+                                                                                                    ),
+                                                                                                )}
+                                                                                            </tr>
+                                                                                        </thead>
+                                                                                        <tbody>
+                                                                                            {tableData.map(
+                                                                                                (
+                                                                                                    row: any,
+                                                                                                    i: number,
+                                                                                                ) => {
+                                                                                                    // Handle both array rows and object rows
+                                                                                                    const cells =
+                                                                                                        Array.isArray(
+                                                                                                            row,
+                                                                                                        )
+                                                                                                            ? row
+                                                                                                            : row.row ||
+                                                                                                              (headers.length >
+                                                                                                              0
+                                                                                                                  ? headers.map(
+                                                                                                                        (
+                                                                                                                            h: string,
+                                                                                                                        ) =>
+                                                                                                                            row[
+                                                                                                                                h
+                                                                                                                            ],
+                                                                                                                    )
+                                                                                                                  : Object.values(
+                                                                                                                        row,
+                                                                                                                    )); // If object, map using headers order or just values
+
+                                                                                                    return (
+                                                                                                        <tr
+                                                                                                            key={
+                                                                                                                i
+                                                                                                            }
+                                                                                                            className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 hover:bg-muted/50"
+                                                                                                        >
+                                                                                                            {cells.map(
+                                                                                                                (
+                                                                                                                    cell: any,
+                                                                                                                    j: number,
+                                                                                                                ) => (
+                                                                                                                    <td
+                                                                                                                        key={
+                                                                                                                            j
+                                                                                                                        }
+                                                                                                                        className="px-6 py-4 whitespace-pre-wrap"
+                                                                                                                    >
+                                                                                                                        {typeof cell ===
+                                                                                                                            'object' &&
+                                                                                                                        cell !==
+                                                                                                                            null
+                                                                                                                            ? cell.text ||
+                                                                                                                              cell.content ||
+                                                                                                                              cell.value ||
+                                                                                                                              JSON.stringify(
+                                                                                                                                  cell,
+                                                                                                                              )
+                                                                                                                            : String(
+                                                                                                                                  cell ??
+                                                                                                                                      '',
+                                                                                                                              )}
+                                                                                                                    </td>
+                                                                                                                ),
+                                                                                                            )}
+                                                                                                        </tr>
+                                                                                                    );
+                                                                                                },
+                                                                                            )}
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                </div>
+                                                                            );
+                                                                        }
+
+                                                                        // Fallback if no structured data
                                                                         return (
                                                                             <div
                                                                                 key={
@@ -1319,7 +1447,8 @@ export default function PDFViewerPage() {
                                                                                               null,
                                                                                               2,
                                                                                           )
-                                                                                        : item.content}
+                                                                                        : item.text ||
+                                                                                          item.content}
                                                                                 </pre>
                                                                             </div>
                                                                         );
